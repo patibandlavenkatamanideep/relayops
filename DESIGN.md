@@ -1,0 +1,242 @@
+# Design Doc — Relay: A Telecom Customer-Service Agent
+
+**Status:** Design + scoped build plan. This is the portfolio revision of the
+original Relay design. The full system architecture is preserved as the target;
+a deliberately scoped v1 vertical slice is what gets built first.
+
+**Working codename:** Relay (productionized as **RelayOps**).
+
+**Context:** Solo portfolio project. The goal is a system that (a) demonstrates
+system-scale thinking, (b) actually runs end to end, and (c) shows realistic
+scoping. All three matter; a half-wired system that doesn't run is the weakest
+outcome.
+
+**Inspiration:** Sierra-style telecom/subscription customer-service agent.
+
+---
+
+## 0. What Relay is, in one paragraph
+Relay is an AI customer-service agent for a telecom/subscription company. It serves
+customers over chat (voice is a designed-but-deferred extension). It can answer
+questions and take low-risk, reversible actions on its own (device resets, sending
+links, toggling settings) but escalates anything that touches billing, plans, or
+payments to a human — and also escalates when it's unsure or when it detects
+distress or abuse. A conversation turn flows through ingest → a deterministic
+access gate (non-LLM) → a tiered model router (cheap first, frontier only when
+needed) → an independent guardrail layer → respond or hand off. Live account
+data is reached only through scoped tools exposed over an MCP server — never via
+RAG, prompt, or model weights. Knowledge is layered by how often it changes (RAG for
+changing facts, config for small stable rules, fine-tuning only for the intent
+classifier and tone). It is tested with simulations and a calibrated judge, and
+measured by cost per successfully resolved task.
+
+## 1. Portfolio scope — what gets built vs. what's designed-only
+This is the most important section. The full design below is sound, but building all
+of it solo is a trap. v1 is one intent, working end to end, with the parts that make
+the system distinctive (the access gate, the guardrail, MCP scoping, a fine-tuned
+classifier, an eval harness). Everything else is documented as designed, not yet
+built — which is itself a strength to show a reviewer.
+
+| Area | v1 — built | Deferred (designed, not built) |
+|---|---|---|
+| Channels | Chat only | Voice: ASR, barge-in/interruption, TTS, S2S |
+| Intents | One ("reset my device") + a small classified set | Full intent taxonomy |
+| Orchestration | Synchronous pipeline | Event-driven bus, parallel fan-out, speculative retrieval |
+| Tenancy | Single brand | Multi-brand config isolation |
+| Tool layer | MCP server, scoped tools | (same pattern, more tools) |
+| Knowledge | Hybrid RAG, cited, small KB | Large per-brand KBs, re-embedding pipelines |
+| Models | Tier 1 small + Tier 2 frontier routing | (same) |
+| Fine-tuning | Intent classifier (with prompted baseline to beat) | Tone/brand-voice fine-tune |
+| Guardrail | Built — truthfulness, allowed-offers, PII, can block | (same, more rules) |
+| Evaluation | Adversarial cases + LLM judge | 5–15× sims, 3-agent, voice variations |
+| Observability | Per-turn token/cost/latency + cost-per-resolved-task | Per-span trace tree, alerting |
+| Deploy | (local / single env) | Shadow → canary → full |
+| Learning | (out of scope) | Suggest-only draft-article loop |
+
+The framing for the README: *"I designed the full production system and built
+a vertical slice that proves the load-bearing ideas."*
+
+## 2. Five terms before we go further
+- **Agent** — not one LLM call. It observes, reasons, acts, observes again, in a loop.
+- **Tiered routing** — a cheap, fast model (with a fine-tuned classifier) handles the
+  easy majority; hard or low-confidence cases escalate to a frontier reasoning model.
+  Cost follows difficulty.
+- **Guardrail layer** — a separate gate after the model writes a reply: checks
+  truthfulness, allowed offers, brand tone, PII. It can block. It is not inline logic.
+- **Deterministic access gate** — a plain (non-LLM) permission check before any model
+  runs: the agent only ever sees what the authenticated customer can see. No model
+  can widen this.
+- **MCP (Model Context Protocol)** — the standard client/server boundary for agent
+  tool access. Relay's tools (account lookup, device reset, send-link) live behind an
+  MCP server that enforces per-customer scoping; the agent is an MCP client.
+
+## 3. The v1 system, drawn once (synchronous, chat-only)
+```
+  customer (chat)
+        │
+        ▼
+ ┌───────────────────────────────┐
+ │ CHANNEL INGEST                │   normalise text
+ └───────────────┬───────────────┘
+                 ▼
+ ┌───────────────────────────────┐
+ │ DETERMINISTIC ACCESS GATE     │   NOT an LLM. authn → resolve permissions =
+ │                               │   exactly what this user may see/do.
+ └───────────────┬───────────────┘   No model can widen this.
+                 ▼
+ ┌───────────────────────────────┐
+ │ INTENT CLASSIFIER (Tier 1)    │   fine-tuned small model; cheap, stable
+ └───────────────┬───────────────┘
+                 ▼
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ MODEL ROUTER                                                          │
+ │   confident & easy  → Tier 1 small model answers                      │
+ │   low conf / hard / action → Tier 2 frontier reasoning model          │
+ │                                                                      │
+ │   Tier 2 pulls:                                                       │
+ │     • Hybrid RAG (BM25 + dense + RRF, cited)  ── changing facts only   │
+ │     • MCP CLIENT → MCP SERVER (scoped tools)  ── live account data     │
+ │          tools: account_lookup · device_reset · send_link             │
+ │          (idempotent, reversible; server enforces per-customer scope)  │
+ └─────────────────────────────────┬────────────────────────────────────┘
+                                    ▼   candidate reply
+ ┌───────────────────────────────┐
+ │ GUARDRAIL LAYER (independent) │   truthfulness · allowed-offers (DATA, not
+ │ can block / redact            │   model-invented) · tone · PII redact
+ └───────────────┬───────────────┘
+                 │  per-intent threshold? emotion/abuse? action class?
+        ┌────────┴─────────────┐
+        ▼                      ▼
+ ┌──────────────┐     ┌──────────────────────┐
+ │ RESPOND      │     │ HUMAN HANDOFF        │  billing/plan/payment · low
+ │ (chat)       │     │ + full context blob  │  confidence · distress · abuse
+ └──────┬───────┘     └──────────┬───────────┘
+        ▼                        ▼
+ ┌──────────────────────────────────────────────────────────┐
+ │ OBSERVABILITY                                            │
+ │ per-turn latency / token / cost · cost-per-resolved-task │
+ └──────────────────────────────────────────────────────────┘
+```
+
+Two load-bearing facts (unchanged from the target design):
+- The access gate is **deterministic and runs before any model**. Security policy
+  before mechanism. Per-customer data only ever enters via a tool call through the
+  MCP server — never RAG, prompt, or weights. A prompt-injected agent still cannot
+  widen access, because the server, not the model, enforces scope.
+- **Tiering is the cost and latency strategy.** The fine-tuned Tier 1 classifier is
+  what lets Relay skip the frontier model on the easy majority — so the fine-tune
+  earns its place in the cost story rather than being a side quest.
+
+> **Target architecture (deferred):** the same stages become event-driven — each
+> emits an event on a bus, stages scale and fail independently, and intent
+> classification / retrieval / abuse screening fan out in parallel with speculative
+> retrieval warming the cache. The v1 synchronous pipeline is a deliberate
+> simplification, not an oversight.
+
+## 4. MCP integration (the tool layer)
+MCP replaces a hand-rolled tool-calling layer with a clean, standard boundary that
+maps directly onto the design's "live data via tool only" rule.
+
+- **Relay (agent) = MCP client.** The frontier model requests a tool; the client
+  routes it to the server.
+- **Account/device service = MCP server.** Exposes a small, explicit tool registry:
+  - `account_lookup(customer_id)` — read-only, scoped to the authenticated customer
+  - `device_reset(device_id)` — reversible, idempotent
+  - `send_link(link_type)` — reversible
+- **Scope is enforced server-side.** The server only ever returns what the
+  authenticated customer may see, regardless of what the model asks for. This is the
+  demonstrable security property: a prompt-injection attempt that tries to read
+  another customer's data is refused by the server, not by hoping the model behaves.
+
+Keep the server small and tightly scoped — three well-permissioned tools read far
+better than a broad surface. The screenshot-able artifact for the portfolio: an
+injection attempt, and the MCP server refusing it.
+
+## 5. Fine-tuning (intent classifier first)
+Strictly inside the volatility split: fine-tuning is for the intent classifier and
+(optionally) tone — never facts. "Facts in weights" stays an avoided anti-pattern;
+telecom plans/policies live in RAG and config.
+
+**v1 deliverable — fine-tune the intent classifier:**
+- A small model mapping an incoming message → one of the supported intents.
+- Establish a prompted (few-shot) classifier as the baseline first, then fine-tune
+  and show the improvement. This turns "I fine-tuned a model" into "I improved
+  routing accuracy from X to Y," which is the stronger portfolio claim.
+- Report concrete numbers: held-out test set, accuracy, and a confusion matrix.
+- Why it earns its place: a good cheap classifier is exactly what lets the router
+  avoid the frontier model on the easy 80% — it's load-bearing in the cost story.
+
+**Watch-out — the dataset is the real work.** Fine-tuning needs labeled
+message→intent pairs; curating that set is often more effort than the training. Seed
+it from the example phrasings of your first intent and grow outward. Budget for this.
+
+**Deferred — tone / brand-voice fine-tune.** Legitimate per the design, but hard to
+evaluate rigorously ("does this sound on-brand?" resists clean metrics), so it's
+polish, not a v1 deliverable.
+
+## 6. Suggested build order (the vertical slice)
+1. One intent, chat-only, end to end. authenticate → classify → access gate →
+   MCP tool call for live data → compose → respond. Working beats broad.
+2. The guardrail blocking something demonstrable — e.g. a hallucinated offer or
+   price. This is the differentiator most portfolio agents lack; show it stopping a
+   bad reply.
+3. RAG with citations for the changing-facts layer, even with a tiny KB.
+4. The fine-tuned classifier, with the prompted baseline to beat (Section 5).
+5. Eval harness — a handful of adversarial cases + an LLM judge. Showing you
+   test agents is rarer and more impressive than the agent itself.
+6. Observability — per-turn token/cost/latency and the cost-per-resolved-task
+   metric. Cheap to add, very legible to reviewers.
+
+## 7. Failure-mode catalog (preserved; v1 defenses noted)
+| # | Failure | At Relay | v1 Defense |
+|---|---|---|---|
+| 1 | Hallucination in critical path | Invents an offer/price/policy | Truthfulness guardrail + citation grounding; offers are DATA; escalate unverifiable |
+| 2 | Model drift | Intent classifier decays on novel tail | Eval vs baseline; fallback to rules (continuous prod eval deferred) |
+| 3 | Tool/API timeout | Account/device tool stalls | Per-call timeout + retry; graceful "let me get a specialist" |
+| 4 | Feedback-loop poisoning | Learning over-fits a few handoffs | N/A in v1 — learning loop deferred; designed as suggest-only |
+| 5 | Orchestration deadlock | A model hangs | Per-call timeouts; partial results (bus/dead-letter deferred) |
+| 6 | Human bottleneck | Escalation queue outgrows reps | Monitor escalation rate; tune thresholds (capacity plan deferred) |
+| 7 | "Almost right" | 90%-right reply misses the dangerous bit | Confidence flagging; adversarial cases in the eval set |
+
+## 8. Human-in-the-loop placement (unchanged target; v1 in bold)
+| Level | Relay intents |
+|---|---|
+| **Full automation (sampled review)** | **Status lookups, device resets, FAQ, send-link** |
+| Human handles exceptions | Low-confidence intents, guardrail/compliance failures |
+| Human decides, agent prepares | Billing/plan/payment changes, complaints — agent gathers context, human acts |
+| Full human + AI assist | Novel situations the KB can't yet cover |
+| Always escalate (emotion/abuse) | Detected distress/anger or abusive input |
+
+Rule of thumb kept from the original: start with more human involvement than you
+think you need.
+
+## 9. Anti-patterns explicitly avoided
+- **Phase skipping** — Phase 0 design done first.
+- **Mechanism without policy** — deterministic access gate is policy-first; MCP server enforces scope.
+- **Embedded compliance** — guardrails are a separate gate.
+- **Evaluation debt** — adversarial cases + calibrated judge before "done."
+- **Observability retrofit** — per-turn cost/latency from day one.
+- **Infinite autonomy** — autonomy set per intent; high-stakes always gated.
+- **Facts in weights** — fine-tuning is classifier + tone only.
+- **Scope sprawl** — v1 is a vertical slice; breadth is documented, not half-built.
+
+## 10. Decision deltas from the original design
+| ID | Decision |
+|---|---|
+| P1 | Scope to a single-intent, chat-only vertical slice for v1; document the rest as designed-not-built. |
+| P2 | Implement the tool layer as an MCP server (client = agent), enforcing per-customer scope server-side. |
+| P3 | Fine-tune the intent classifier, with a prompted baseline to beat and reported before/after metrics. Tone fine-tune deferred; facts never fine-tuned. |
+| P4 | Defer: voice, multi-brand isolation, event bus, shadow→canary, continuous-learning loop. Kept in the design as targets. |
+
+(Original decisions D1–D14 remain in the decision log; these P-deltas layer on top.)
+
+## 11. Scope and next step
+**Delivered in this revision:** portfolio framing, an explicit v1-vs-deferred split,
+a v1 (synchronous, chat-only) architecture diagram, the MCP tool-layer design, the
+intent-classifier fine-tuning plan with a baseline-to-beat, an ordered build plan,
+and the preserved failure-mode / HITL / anti-pattern thinking.
+
+**Next step:** pick the one intent ("reset my device"), write its example
+phrasings (this seeds the classifier dataset), and drive it through the build order
+in Section 6 — MCP tool call, guardrail block, eval case, cost metric — before
+generalizing to more intents.
