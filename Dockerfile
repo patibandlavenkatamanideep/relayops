@@ -11,4 +11,6 @@ RUN python -m pip install --upgrade pip && python -m pip install -r requirements
 
 COPY . .
 
-CMD ["sh", "-c", "python -m streamlit run src/ui/app.py --server.address=0.0.0.0 --server.port=${PORT:-8501} --server.headless=true --browser.gatherUsageStats=false"]
+EXPOSE 8501
+
+CMD ["sh", "scripts/start_streamlit.sh"]
