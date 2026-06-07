@@ -10,3 +10,6 @@ __pycache__
 chroma
 *.sqlite3
 .DS_Store
+notebooks
+models
+*.zip

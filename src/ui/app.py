@@ -6,10 +6,19 @@ Run:
 
 from __future__ import annotations
 
-import streamlit as st
+import sys
+from pathlib import Path
 
-from src.graph.pipeline import handle_turn
-from src.router.registry import get_classifier
+# Streamlit/Railway launch this script with its own directory on sys.path, not the
+# repo root — so make the project root importable before importing `src.*`.
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+import streamlit as st  # noqa: E402
+
+from src.graph.pipeline import handle_turn  # noqa: E402
+from src.router.registry import get_classifier  # noqa: E402
 
 
 AUTH_OPTIONS = {
