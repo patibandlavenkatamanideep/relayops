@@ -237,6 +237,12 @@ def handle_turn(
         response = _escalate(state, reason=state.route.reason)
     else:
         state = run_tool(state)
+        if state.tool_results and not state.tool_results[-1].ok:
+            error = state.tool_results[-1].error or "tool_failed"
+            response = _escalate(state, reason=f"tool_error:{error}")
+            response.latency_ms = (time.perf_counter() - start) * 1000
+            state.response = response
+            return response
         if state.route and state.route.retrieve:
             state = retrieve(state)
             # No grounding found -> don't answer from nothing; escalate.

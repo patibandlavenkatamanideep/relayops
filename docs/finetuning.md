@@ -72,7 +72,7 @@ on the same held-out + adversarial sets:
 |---|---|---|
 | keyword baseline | ~0 | brittle on paraphrases / slang |
 | Complement NB | ~0 | offline learned baseline; beats keyword on the tail |
-| fine-tuned Qwen2.5-1.5B | low | best paraphrase + adversarial handling (target) |
+| fine-tuned Qwen2.5-1.5B | low | training path implemented; final eval pending |
 | prompted frontier (Claude) | high | strong zero-shot; the Tier-2 reference |
 
 Current measured on the expanded 2,400-example paraphrase-rich dataset (offline,

@@ -78,8 +78,11 @@ class PipelineTests(unittest.TestCase):
         r = handle_turn(
             "reset device dev_b1", auth_token="tok_alice", device_id="dev_b1"
         )
-        # Tool refused -> compose falls back to a specialist message, not a crash.
+        # Tool refused server-side -> handoff with context, not a crash.
         self.assertFalse(r.tool_results[-1].ok)
+        self.assertTrue(r.escalated)
+        self.assertEqual(r.disposition, Disposition.ESCALATE)
+        self.assertEqual(r.handoff_context["reason"], "tool_error:scope_violation")
         self.assertIn("specialist", r.text.lower())
 
     def test_billing_escalates(self):
