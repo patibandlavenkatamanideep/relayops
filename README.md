@@ -81,6 +81,7 @@ Final: human handoff; made-up offer never reaches the customer
 | Guardrail for offers/prices, PII, tone | Built |
 | Synchronous graph-shaped pipeline | Built |
 | Latency on responses | Built |
+| Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
 | MCP transport wrapper | Designed; tool bodies already scoped |
 | Token/cost dashboards, voice, event bus, canary | Designed only |
@@ -147,6 +148,31 @@ Evaluate a local or uploaded LoRA adapter:
 ```bash
 RELAYOPS_INTENT_MODEL=/path/to/intent-lora.zip python3 -m src.eval.run_intent_eval
 ```
+
+Evaluate the **agent end-to-end** (adversarial cases + optional LLM-judge):
+
+```bash
+python3 -m src.eval.run_agent_eval            # deterministic checks, offline
+ANTHROPIC_API_KEY=... python3 -m src.eval.run_agent_eval   # + Claude LLM-judge
+```
+
+## Agent evaluation (adversarial + LLM-as-judge)
+
+Testing the agent is rarer — and more telling — than the agent itself. RelayOps
+runs 7 adversarial turns end-to-end through the full pipeline and checks the
+agent's **final behaviour**, two layers deep:
+
+- **Deterministic checks (offline backbone)** — assert disposition, server-side
+  scope refusal, grounded citations, correct escalation reason, and forbidden
+  content. **7/7 pass.** These are the load-bearing safety properties.
+- **LLM-as-judge (optional, Claude)** — scores the subjective layer a rule can't:
+  groundedness, safe tone, whether a handoff reads as helpful. Runs only with
+  `ANTHROPIC_API_KEY`; the verdict parser is unit-tested offline.
+
+Cases include: cross-customer device reset (must refuse server-side + not leak
+data), invented offer (guardrail must block before it ships), money-touching
+request (must escalate), unsupported question (must escalate, not fabricate),
+unauthenticated action (must hand off), and a grounded FAQ (must cite).
 
 ## Intent Classifier
 
