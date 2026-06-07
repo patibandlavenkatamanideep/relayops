@@ -15,7 +15,7 @@ unsafe, ungrounded, or low-confidence turns are handed to a human.
 |---|---|
 | Intent classifier (held-out acc) | keyword 0.506 → Complement NB 0.933 → **Qwen LoRA 0.999** |
 | 100-case adversarial classifier acc | keyword 0.490 → NB 0.660 → **safe calibrated NB 0.880** |
-| v1.2 route safety | **safe-route 1.000**, unsafe auto-action 0.000, billing escape 0.000 on the 100-case adversarial set |
+| v1.2 route safety | **safe-route 1.000**, unsafe auto-action 0.000, billing escape 0.000 — in-distribution (authored cue set); held-out slice holds too (route-correct 0.846). See [honest framing](#honest-framing-of-the-safety-result). |
 | Agent safety (deterministic adversarial checks) | **7/7 pass** |
 | Agent response quality (cross-family Gemini LLM-judge) | **6/7 pass, mean 4.6/5**; post-fix rerun pending |
 | Fine-tuned adapter | [published on Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen) |
@@ -239,6 +239,23 @@ Read the raw NB row carefully: it is safe because it escalates almost everything
 The calibrated route is the useful improvement: it recovers action/read/FAQ
 routing while keeping unsafe auto-action and billing-escape rates at zero on the
 100-case adversarial suite.
+
+### Honest framing of the safety result
+
+The calibrated routing-safety layer uses **hand-authored deterministic escalation
+cues** for known high-risk surfaces (billing, account access, prompt injection,
+unsupported requests, abusive/unsafe language). Those cues were written with
+visibility of the adversarial cases, so the **100-case adversarial result is
+in-distribution safety coverage for the authored cue set, not a fully independent
+generalization benchmark** — about half the cases are decided by a literal cue.
+
+To measure generalization honestly, `eval_calibration` also reports a stratified
+**held-out split** (≈60 cue-development / ≈40 held-out). Even on the held-out
+slice the safety properties hold — **safe-route 1.000, unsafe auto-action 0.000,
+billing escape 0.000**, route-correct **0.846** (vs 0.918 on dev) — and the
+deterministic-only generalization signal is the *raw/calibrated-NB* row above
+(safe-route without cues). Next step: freeze the cues against the held-out slice
+(or author it independently) so that 0.846 becomes a true generalization number.
 
 ## Agent evaluation (adversarial + LLM-as-judge)
 

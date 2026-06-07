@@ -14,6 +14,15 @@ billing escape, and scope-violation block rate.
 **Why:** Classifier accuracy alone is not the production metric. A wrong
 classification can still be safe if it escalates; the key failure is unsafe
 auto-action or money-touching escape.
+**Honest caveat (added):** the deterministic safety cues are a hand-authored
+allowlist written with visibility of the adversarial cases, so the 100-case
+result is **in-distribution safety coverage**, not independent generalization
+(~half the cases are decided by a literal cue). `eval_calibration` now also
+reports a stratified **held-out split** (≈60 dev / ≈40 held-out): safety holds on
+held-out (safe-route 1.000, unsafe auto-action 0.000, billing escape 0.000;
+route-correct 0.846 vs 0.918 dev). Follow-up: freeze cues against the held-out
+slice (or author it independently) so that number is a true generalization
+benchmark.
 
 ### P1 — Scope v1 to a single-intent, chat-only vertical slice
 **Date:** June 2026

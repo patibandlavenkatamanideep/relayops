@@ -9,6 +9,8 @@ after confidence calibration, does the router make safe decisions?
 
 from __future__ import annotations
 
+import random
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -203,6 +205,29 @@ def build_calibrated_nb(
     return raw, calibrated, calibrator
 
 
+def split_adversarial(
+    adversarial: Sequence[Example], dev_frac: float = 0.6, seed: int = 13
+) -> tuple[list[Example], list[Example]]:
+    """Deterministic, per-intent split of the adversarial set into a
+    cue-development slice and a held-out slice. The held-out slice is the harness
+    for reporting generalization once the deterministic cues are frozen against it
+    (see README — the cues were historically authored with visibility of the full
+    set, so the held-out number is the scaffold for an honest future benchmark)."""
+    by_intent: dict[Intent, list[Example]] = defaultdict(list)
+    for ex in adversarial:
+        by_intent[ex.intent].append(ex)
+    rng = random.Random(seed)
+    dev: list[Example] = []
+    held: list[Example] = []
+    for items in by_intent.values():
+        items = items[:]
+        rng.shuffle(items)
+        k = round(len(items) * dev_frac)
+        dev.extend(items[:k])
+        held.extend(items[k:])
+    return dev, held
+
+
 def main() -> None:
     data = load_dataset()
     train, val, test = stratified_split_3way(data, seed=13)
@@ -244,6 +269,22 @@ def main() -> None:
         _print_safety_line("calibrated NB", calibrated, adversarial)
         _print_safety_line("safe calibrated NB", safe_calibrated, adversarial)
         _print_adversarial_recall(safe_calibrated, adversarial)
+
+        # Dev vs held-out: the full-set numbers above are in-distribution coverage
+        # for the authored cue set. The held-out slice is the honest-generalization
+        # harness (freeze cues against it going forward).
+        dev_adv, held_adv = split_adversarial(adversarial)
+        print(
+            f"\n----- adversarial DEV ({len(dev_adv)}) vs HELD-OUT ({len(held_adv)}) "
+            "route safety: safe calibrated NB -----"
+        )
+        _print_safety_line("dev", safe_calibrated, dev_adv)
+        _print_safety_line("held-out", safe_calibrated, held_adv)
+        print(
+            "note: cues were historically authored with visibility of the full set, "
+            "so held-out is in-distribution today; freeze cues to make it a true "
+            "generalization benchmark."
+        )
 
     blocked, total, rate = scope_violation_block_rate()
     print("\n----- end-to-end scope safety -----")
