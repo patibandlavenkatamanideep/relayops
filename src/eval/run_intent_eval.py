@@ -23,7 +23,13 @@ from ..core.models import Intent
 from ..router.classifier import BaselineClassifier
 from ..router.trained_classifier import TrainedClassifier
 from .dataset import Example, load_dataset, stratified_split
-from .metrics import accuracy, classification_report, confusion_matrix, format_confusion_matrix
+from .metrics import (
+    accuracy,
+    classification_report,
+    confusion_matrix,
+    format_confusion_matrix,
+    macro_f1,
+)
 
 _LABELS = [i.value for i in Intent]
 _ADVERSARIAL = Path(__file__).resolve().parent / "data" / "adversarial.jsonl"
@@ -47,14 +53,20 @@ def _report(name: str, y_true: list[str], y_pred: list[str]) -> float:
 _SEEDS = [13, 29, 47, 71, 101]
 
 
-def _cv_accuracy(data, build_clf) -> float:
-    """Mean held-out accuracy across seeds — stabilises the small-data variance."""
-    accs = []
+def _cv_metrics(data, build_clf) -> tuple[float, float]:
+    """Mean held-out (accuracy, macro-F1) across seeds — stabilises variance.
+
+    Macro-F1 weights every intent equally, so it catches a model that wins on
+    accuracy by leaning on the easy/over-represented classes.
+    """
+    accs, f1s = [], []
     for seed in _SEEDS:
         train, test = stratified_split(data, test_frac=0.3, seed=seed)
         clf = build_clf([(e.text, e.intent) for e in train])
-        accs.append(accuracy(*_evaluate(clf, test)))
-    return sum(accs) / len(accs)
+        y_true, y_pred = _evaluate(clf, test)
+        accs.append(accuracy(y_true, y_pred))
+        f1s.append(macro_f1(y_true, y_pred, _LABELS))
+    return sum(accs) / len(accs), sum(f1s) / len(f1s)
 
 
 def main() -> None:
@@ -86,8 +98,8 @@ def main() -> None:
             finetuned = None
 
     # Stable headline: 5-seed cross-validation.
-    cv_keyword = _cv_accuracy(data, lambda _: BaselineClassifier())
-    cv_trained = _cv_accuracy(data, lambda pairs: TrainedClassifier().fit(pairs))
+    cv_keyword_acc, cv_keyword_f1 = _cv_metrics(data, lambda _: BaselineClassifier())
+    cv_trained_acc, cv_trained_f1 = _cv_metrics(data, lambda pairs: TrainedClassifier().fit(pairs))
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
@@ -106,10 +118,12 @@ def main() -> None:
     print(f"trained model    accuracy : {acc_trained:.3f}")
 
     print(f"\n----- summary ({len(_SEEDS)}-seed cross-validation) -----")
-    print(f"keyword baseline accuracy : {cv_keyword:.3f}")
-    print(f"trained model    accuracy : {cv_trained:.3f}")
-    delta = (cv_trained - cv_keyword) * 100
-    print(f"improvement              : {delta:+.1f} points")
+    print(f"keyword baseline : acc {cv_keyword_acc:.3f}  macro-F1 {cv_keyword_f1:.3f}")
+    print(f"trained model    : acc {cv_trained_acc:.3f}  macro-F1 {cv_trained_f1:.3f}")
+    print(
+        f"improvement      : acc {(cv_trained_acc - cv_keyword_acc) * 100:+.1f} pts  "
+        f"macro-F1 {(cv_trained_f1 - cv_keyword_f1) * 100:+.1f} pts"
+    )
 
     # Adversarial / paraphrase set: trained on the FULL dataset, tested on held-out
     # hard cases (slang, mixed-intent, out-of-taxonomy) that expose brittleness.
@@ -117,11 +131,15 @@ def main() -> None:
         adv = load_dataset(_ADVERSARIAL)
         full = TrainedClassifier().fit([(e.text, e.intent) for e in data])
         kw = BaselineClassifier()
+        def _line(name: str, clf) -> None:
+            y_true, y_pred = _evaluate(clf, adv)
+            print(f"{name} : acc {accuracy(y_true, y_pred):.3f}  macro-F1 {macro_f1(y_true, y_pred, _LABELS):.3f}")
+
         print("\n----- adversarial / paraphrase set -----")
-        print(f"keyword baseline accuracy : {accuracy(*_evaluate(kw, adv)):.3f}")
-        print(f"trained model    accuracy : {accuracy(*_evaluate(full, adv)):.3f}")
+        _line("keyword baseline", kw)
+        _line("trained model   ", full)
         if finetuned is not None:
-            print(f"fine-tuned model accuracy : {accuracy(*_evaluate(finetuned, adv)):.3f}")
+            _line("fine-tuned model", finetuned)
 
 
 if __name__ == "__main__":

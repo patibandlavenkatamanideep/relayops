@@ -150,17 +150,21 @@ The classifier story is model selection, not "I used an LLM." Every classifier
 implements the same `IntentClassifier` interface, so the router can swap them
 without changing pipeline logic.
 
-| Classifier | Cost | 5-seed held-out accuracy | Role |
-|---|---|---:|---|
-| Keyword baseline | ~$0 | 0.492 | Brittle baseline |
-| Complement NB | ~$0 | **0.932** | Strong offline learned baseline |
-| Qwen2.5-1.5B LoRA | Low | eval pending | Intended Tier-1 neural classifier |
-| Claude Haiku prompt | Higher | optional | Tier-2/reference baseline |
+| Classifier | Cost | 5-seed acc | 5-seed macro-F1 | Role |
+|---|---|---:|---:|---|
+| Keyword baseline | ~$0 | 0.492 | 0.506 | Brittle baseline |
+| Complement NB | ~$0 | **0.932** | **0.931** | Strong offline learned baseline |
+| Qwen2.5-1.5B LoRA | Low | eval pending | eval pending | Intended Tier-1 neural classifier |
+| Claude Haiku prompt | Higher | optional | optional | Tier-2/reference baseline |
+
+Macro-F1 (every intent weighted equally) is reported alongside accuracy so a model
+can't look good by leaning on easy/over-represented classes.
 
 The dataset is 2,400 examples, balanced at 400 examples per intent, with
 group-aware splits so related synthetic paraphrase families do not leak across
-train/test. On the adversarial/paraphrase set, keyword baseline scores `0.250`
-and Complement NB scores `0.667`.
+train/test. On the harder adversarial/paraphrase set the gap stays clear but both
+drop: keyword baseline `0.250` acc / `0.242` macro-F1, Complement NB `0.667` acc /
+`0.562` macro-F1 — the headroom the neural fine-tune is meant to close.
 
 ### Why NB Is Not The Final Answer
 
@@ -175,19 +179,42 @@ RelayOps fine-tunes a **small open-source model**, not Claude.
 
 ## Architecture
 
+v1 is a synchronous pipeline. Two properties are load-bearing and both are built:
+the access gate is **deterministic and runs before any model**, and per-customer
+data is reached **only** through the scoped tool layer — never via prompt, RAG, or
+model weights — so a prompt-injected model still cannot widen scope.
+
 ```text
-customer message
-  -> access gate
-  -> intent classifier
-  -> router
-  -> scoped tool or RAG
-  -> composer
-  -> independent guardrail
-  -> response or human handoff
+customer chat turn
+      │
+      ▼
+ ingest ─► DETERMINISTIC ACCESS GATE        non-LLM: authn → per-customer scope
+      │
+      ▼
+ INTENT CLASSIFIER (Tier 1)                 keyword · Complement NB · Qwen LoRA
+      │
+      ▼
+ ROUTER ── confident + low-risk ─► Tier 1 answer
+      │     action / low-conf / hard ─► Tier 2, which pulls:
+      │        ├─ SCOPED TOOLS (MCP-shaped): account_lookup · device_reset · send_link
+      │        │     scope enforced SERVER-SIDE against the gate's customer
+      │        └─ HYBRID RAG (BM25 + dense, RRF): cited; escalates if nothing grounds
+      │
+      ▼
+ composer ─► INDEPENDENT GUARDRAIL          truthfulness/offers · PII · tone — can BLOCK
+      │
+      ├─► RESPOND (chat)
+      └─► HUMAN HANDOFF + full context blob
+            triggers: billing/plan/payment · low confidence · guardrail block ·
+                      unverifiable RAG · scope violation · unauthenticated
+      │
+      ▼
+ OBSERVABILITY (planned, step 6)            per-turn token/cost/latency
 ```
 
-See [DESIGN.md](DESIGN.md) for the full production design and deferred systems
-plan.
+Deferred (designed, not built): MCP transport wrapper, event bus, token/cost
+dashboards, voice, shadow→canary. See [DESIGN.md](DESIGN.md) for the full
+production design and the v1-vs-deferred split.
 
 ## Repository Layout
 
@@ -199,7 +226,7 @@ src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline
 src/eval/           datasets, finetune export, classifier eval
-src/observability/  planned token/cost dashboards
-src/ui/             planned Streamlit chat
+src/observability/  planned token/cost dashboards (step 6)
+src/ui/             Streamlit interactive demo UI (built)
 knowledge_base/     small cited KB
 ```
