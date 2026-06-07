@@ -2,9 +2,6 @@
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
-[build.variables]
-RAILPACK_INSTALL_CMD = "pip install ."
-
 [deploy]
 startCommand = "python -m streamlit run src/ui/app.py --server.address=0.0.0.0 --server.port=$PORT --server.headless=true --browser.gatherUsageStats=false"
 healthcheckPath = "/"
