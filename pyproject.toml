@@ -37,6 +37,17 @@ dev = [
 embeddings = [
     "voyageai>=0.3",
 ]
+# Fine-tuning the Tier-1 intent classifier (Unsloth + LoRA) and serving it.
+# GPU recommended for training. Without this the classifier registry's
+# "finetuned" option is unavailable and eval uses keyword / Complement NB.
+finetune = [
+    "unsloth",
+    "transformers>=4.44",
+    "peft>=0.12",
+    "trl>=0.9",
+    "datasets>=2.20",
+    "torch>=2.3",
+]
 
 [build-system]
 requires = ["hatchling"]

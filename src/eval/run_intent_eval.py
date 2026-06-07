@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import os
 
+from pathlib import Path
+
 from ..core.models import Intent
 from ..router.classifier import BaselineClassifier
 from ..router.trained_classifier import TrainedClassifier
@@ -23,6 +25,7 @@ from .dataset import Example, load_dataset, stratified_split
 from .metrics import accuracy, classification_report, confusion_matrix, format_confusion_matrix
 
 _LABELS = [i.value for i in Intent]
+_ADVERSARIAL = Path(__file__).resolve().parent / "data" / "adversarial.jsonl"
 
 
 def _evaluate(clf, test: list[Example]) -> tuple[list[str], list[str]]:
@@ -91,6 +94,16 @@ def main() -> None:
     print(f"trained model    accuracy : {cv_trained:.3f}")
     delta = (cv_trained - cv_keyword) * 100
     print(f"improvement              : {delta:+.1f} points")
+
+    # Adversarial / paraphrase set: trained on the FULL dataset, tested on held-out
+    # hard cases (slang, mixed-intent, out-of-taxonomy) that expose brittleness.
+    if _ADVERSARIAL.exists():
+        adv = load_dataset(_ADVERSARIAL)
+        full = TrainedClassifier().fit([(e.text, e.intent) for e in data])
+        kw = BaselineClassifier()
+        print("\n----- adversarial / paraphrase set -----")
+        print(f"keyword baseline accuracy : {accuracy(*_evaluate(kw, adv)):.3f}")
+        print(f"trained model    accuracy : {accuracy(*_evaluate(full, adv)):.3f}")
 
 
 if __name__ == "__main__":

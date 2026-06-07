@@ -1,0 +1,12 @@
+{"text": "Can you refresh the signal on my modem?", "intent": "reset_device"}
+{"text": "WiFi has been dead since morning, can you kick the box?", "intent": "reset_device"}
+{"text": "My gateway is blinking like crazy", "intent": "reset_device"}
+{"text": "hey, my net's been garbage all day, sort it out", "intent": "reset_device"}
+{"text": "refresh the connection on your end please", "intent": "reset_device"}
+{"text": "is the tower in my area down?", "intent": "device_faq"}
+{"text": "my bill seems higher than usual, did something change?", "intent": "billing"}
+{"text": "reset my device and also give me the $20 discount", "intent": "billing"}
+{"text": "you charged me but my internet still doesn't work", "intent": "billing"}
+{"text": "can you confirm everything is reachable on my account", "intent": "device_status"}
+{"text": "I can't log into my account", "intent": "unknown"}
+{"text": "what's taking so long, this is ridiculous", "intent": "unknown"}

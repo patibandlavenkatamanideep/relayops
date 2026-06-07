@@ -32,6 +32,24 @@ See [DESIGN.md](DESIGN.md) §3 for the v1 diagram and §1 for the built-vs-defer
 ## Tech stack
 LangGraph · MCP · Chroma (vector DB) · Streamlit (UI) · Tier 1 + Tier 2 models · LLM-as-judge eval
 
+## Intent classifier (Tier 1) — model selection, not "I used an LLM"
+The cheap Tier-1 classifier is what lets the router skip the frontier model on the
+easy majority, so it's evaluated as a model-selection decision across four options
+behind one `IntentClassifier` interface (`router.registry.get_classifier`):
+
+| Classifier | Cost | Held-out (5-seed CV) | Notes |
+|---|---|---|---|
+| keyword baseline | ~0 | 0.60 | brittle on paraphrases/slang |
+| Complement NB (offline learned) | ~0 | **0.70** | beats keyword by +10 pts |
+| fine-tuned Qwen2.5-1.5B (Unsloth/LoRA) | low | target | best paraphrase/adversarial handling |
+| prompted frontier (Claude Haiku) | high | — | strong zero-shot Tier-2 reference |
+
+Reported with a confusion matrix and an **adversarial/paraphrase** set (keyword 0.25
+→ NB 0.33 — both weak, which is the gap the fine-tune closes). The fine-tune is a
+**small open-source model**, not Claude; see [docs/finetuning.md](docs/finetuning.md).
+The model emits intent only (routing/risk stay in the deterministic gate+router),
+and confidence comes from token probabilities — not fabricated labels.
+
 ## Repository layout
 ```
 src/access/         deterministic access gate

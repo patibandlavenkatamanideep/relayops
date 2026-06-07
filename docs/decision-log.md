@@ -22,6 +22,18 @@ Report held-out accuracy + confusion matrix. Tone fine-tune deferred; facts neve
 **Why:** Turns "I fine-tuned a model" into "I improved routing accuracy from X to Y."
 The cheap classifier is load-bearing in the cost story (skips frontier on the easy 80%).
 
+### P5 — Fine-tune target = small open-source LM (Qwen2.5-1.5B) via Unsloth/LoRA
+**Date:** June 2026
+The Tier-1 classifier is a fine-tuned small open model, not Claude. Offline, a
+Complement-NB model stands in (beats keyword 0.60→0.70 CV); the real fine-tune
+recipe + chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship
+for GPU runs. Classifiers are switchable via `router.registry.get_classifier`.
+**Why:** Anthropic has no customer fine-tuning of Claude — the honest, stronger
+claim is "fine-tuned a small open model, kept Claude for Tier-2". Refinements on
+the external review: model emits **intent only** (risk/route stay in the
+deterministic router — policy out of weights), and **confidence comes from token
+probabilities**, not fabricated labels. Evaluated on a held-out + adversarial set.
+
 ### P4 — Defer voice, multi-brand isolation, event bus, shadow→canary, learning loop
 **Date:** June 2026
 Kept in the design as targets; not built in v1.
