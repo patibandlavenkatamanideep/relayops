@@ -196,6 +196,10 @@ class FineTunedIntentClassifier:
             gc.temperature = None
             gc.top_p = None
             gc.top_k = None
+            # Qwen ships max_length=32768; we control length via max_new_tokens, so
+            # clear it to avoid the "both max_new_tokens and max_length set" warning
+            # printed on every prediction.
+            gc.max_length = None
 
     def classify(self, text: str) -> Classification:
         import math
