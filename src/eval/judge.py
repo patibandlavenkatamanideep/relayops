@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 
 from ..core.models import AgentResponse
@@ -73,6 +74,14 @@ def _context(resp: AgentResponse) -> str:
         f"disposition={resp.disposition.value}; escalated={resp.escalated}; "
         f"tool={tool}; citations={len(resp.citations)}; guardrail={resp.guardrail_action}"
     )
+
+
+_RETRY_SECS = re.compile(r"retry in ([\d.]+)s", re.IGNORECASE)
+
+
+def _retry_after(err: str, default: float) -> float:
+    m = _RETRY_SECS.search(err)
+    return float(m.group(1)) if m else default
 
 
 def _prompt(case: JudgeCase, resp: AgentResponse) -> str:
@@ -135,24 +144,51 @@ class GeminiJudge:
         from google import genai  # pip install google-genai
 
         self._genai = genai
+        # gemini-2.5-flash has free-tier quota on typical keys; we disable its
+        # thinking (below) so it returns clean JSON instead of spending the output
+        # budget on hidden reasoning. Override via RELAYOPS_JUDGE_MODEL.
         self._model = os.environ.get("RELAYOPS_JUDGE_MODEL", "gemini-2.5-flash")
+        # Free tier is ~5 req/min; space calls out (override for paid keys).
+        self._min_interval = float(os.environ.get("RELAYOPS_JUDGE_DELAY", "13"))
+        self._last = 0.0
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self._client = genai.Client(api_key=api_key)
+
+    def _throttle(self) -> None:
+        wait = self._min_interval - (time.monotonic() - self._last)
+        if wait > 0:
+            time.sleep(wait)
 
     def judge(self, case: JudgeCase, resp: AgentResponse) -> JudgeVerdict:
         from google.genai import types
 
-        result = self._client.models.generate_content(
-            model=self._model,
-            contents=_prompt(case, resp),
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM,
-                response_mime_type="application/json",
-                max_output_tokens=256,
-                temperature=0,
-            ),
+        kwargs = dict(
+            system_instruction=_SYSTEM,
+            response_mime_type="application/json",
+            max_output_tokens=512,
+            temperature=0,
         )
-        return parse_verdict(result.text or "")
+        if "2.5" in self._model:  # disable thinking -> output goes to the JSON answer
+            kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+        config = types.GenerateContentConfig(**kwargs)
+
+        last: Exception | None = None
+        for attempt in range(5):
+            self._throttle()
+            try:
+                result = self._client.models.generate_content(
+                    model=self._model, contents=_prompt(case, resp), config=config
+                )
+                self._last = time.monotonic()
+                return parse_verdict(result.text or "")
+            except Exception as e:
+                self._last = time.monotonic()
+                last = e
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    time.sleep(min(_retry_after(str(e), 2 ** attempt + 1), 60))
+                    continue
+                raise
+        raise last  # type: ignore[misc]
 
 
 # Backwards-compatible alias.
