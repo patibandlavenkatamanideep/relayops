@@ -6,15 +6,18 @@ DESIGN.md §3. Porting to LangGraph means registering these as nodes on a
 ``StateGraph`` with the same state object and adding the conditional edge at the
 disposition branch — no node-body changes required.
 
-    ingest -> access gate -> classify -> route -> [tool] -> compose -> respond
+    ingest -> access gate -> classify -> route -> [tool] -> compose -> GUARDRAIL -> respond
 
-The guardrail layer (step 2), RAG (step 3), the fine-tuned classifier (step 4),
-eval (step 5) and richer observability (step 6) slot in around these nodes.
+The guardrail (step 2) is an INDEPENDENT gate between compose and respond: it
+vets the candidate reply and can block (force handoff) or redact. RAG (step 3),
+the fine-tuned classifier (step 4), eval (step 5) and richer observability
+(step 6) slot in around these nodes.
 """
 
 from __future__ import annotations
 
 import time
+from typing import Protocol
 
 from ..access import gate
 from ..core import data
@@ -23,10 +26,10 @@ from ..core.models import (
     AgentResponse,
     Disposition,
     Intent,
-    Tier,
     ToolResult,
     TurnState,
 )
+from ..guardrails import guardrail
 from ..mcp import tools
 from ..router import router
 from ..router.classifier import BaselineClassifier, IntentClassifier
@@ -86,78 +89,87 @@ def run_tool(state: TurnState) -> TurnState:
     return state
 
 
-def compose(state: TurnState) -> str:
-    """Turn results into a customer-facing reply.
+# --- composer (Tier 1/2 stand-in) ----------------------------------------------
 
-    v1 uses deterministic templates so the slice runs without an LLM. The Tier 2
-    frontier model plugs in here (it would draft the reply grounded in
-    ``tool_results``); the guardrail in step 2 wraps this output before it ships.
-    """
-    assert state.classification is not None and state.route is not None
-    intent = state.classification.intent
 
-    if intent == Intent.RESET_DEVICE:
-        res = state.tool_results[-1] if state.tool_results else None
-        if res and res.ok:
+class Composer(Protocol):
+    def compose(self, state: TurnState) -> str: ...
+
+
+class TemplateComposer:
+    """Deterministic templated replies so the slice runs without an LLM. The
+    real Tier 2 frontier model plugs in here, drafting grounded in tool_results;
+    the guardrail vets whatever it produces."""
+
+    def compose(self, state: TurnState) -> str:
+        assert state.classification is not None
+        intent = state.classification.intent
+
+        if intent == Intent.RESET_DEVICE:
+            res = state.tool_results[-1] if state.tool_results else None
+            if res and res.ok:
+                return (
+                    f"Done — I reset your {res.data['name']} and it's back online. "
+                    "Give it about 60 seconds to reconnect. Anything else?"
+                )
             return (
-                f"Done — I reset your {res.data['name']} and it's back online. "
-                "Give it about 60 seconds to reconnect. Anything else?"
+                "I wasn't able to reset that device just now. Let me get a "
+                "specialist to take a look."
             )
-        return (
-            "I wasn't able to reset that device just now. Let me get a specialist "
-            "to take a look."
-        )
 
-    if intent == Intent.DEVICE_STATUS:
-        res = state.tool_results[-1] if state.tool_results else None
-        if res and res.ok:
-            lines = [
-                f"- {d['name']}: {'online' if d['online'] else 'offline'}"
-                for d in res.data.get("devices", [])
-            ]
-            return "Here's your device status:\n" + "\n".join(lines)
-        return "I couldn't pull your device status right now."
+        if intent == Intent.DEVICE_STATUS:
+            res = state.tool_results[-1] if state.tool_results else None
+            if res and res.ok:
+                lines = [
+                    f"- {d['name']}: {'online' if d['online'] else 'offline'}"
+                    for d in res.data.get("devices", [])
+                ]
+                return "Here's your device status:\n" + "\n".join(lines)
+            return "I couldn't pull your device status right now."
 
-    if intent == Intent.GREETING:
-        return "Hi! I can help reset a device or check its status. What's going on?"
+        if intent == Intent.GREETING:
+            return "Hi! I can help reset a device or check its status. What's going on?"
 
-    return "Let me connect you with someone who can help."
+        return "Let me connect you with someone who can help."
 
 
-def respond_or_handoff(state: TurnState) -> AgentResponse:
+# --- response builders ---------------------------------------------------------
+
+
+def _escalate(state: TurnState, reason: str, extra: dict | None = None) -> AgentResponse:
     assert state.classification is not None and state.route is not None
-    route = state.route
-
-    if route.disposition == Disposition.ESCALATE or (
-        state.access and not state.access.authenticated
-    ):
-        handoff = {
-            "reason": "unauthenticated"
-            if (state.access and not state.access.authenticated)
-            else route.reason,
-            "intent": state.classification.intent.value,
-            "confidence": round(state.classification.confidence, 2),
-            "message": state.text,
-        }
-        return AgentResponse(
-            text=(
-                "I'm connecting you with a specialist who can help with this — "
-                "they'll have the full context of our chat."
-            ),
-            intent=state.classification.intent,
-            tier=route.tier,
-            disposition=Disposition.ESCALATE,
-            escalated=True,
-            tool_results=state.tool_results,
-            handoff_context=handoff,
-        )
-
+    handoff = {
+        "reason": reason,
+        "intent": state.classification.intent.value,
+        "confidence": round(state.classification.confidence, 2),
+        "message": state.text,
+    }
+    if extra:
+        handoff.update(extra)
     return AgentResponse(
-        text=compose(state),
+        text=(
+            "I'm connecting you with a specialist who can help with this — "
+            "they'll have the full context of our chat."
+        ),
         intent=state.classification.intent,
-        tier=route.tier,
+        tier=state.route.tier,
+        disposition=Disposition.ESCALATE,
+        escalated=True,
+        tool_results=state.tool_results,
+        handoff_context=handoff,
+    )
+
+
+def _respond(state: TurnState, text: str, guard: guardrail.GuardrailResult) -> AgentResponse:
+    assert state.classification is not None and state.route is not None
+    return AgentResponse(
+        text=text,
+        intent=state.classification.intent,
+        tier=state.route.tier,
         disposition=Disposition.RESPOND,
         tool_results=state.tool_results,
+        guardrail_action=guard.action,
+        guardrail_violations=guard.violations,
     )
 
 
@@ -169,26 +181,40 @@ def handle_turn(
     auth_token: str | None = None,
     device_id: str | None = None,
     classifier: IntentClassifier | None = None,
+    composer: Composer | None = None,
 ) -> AgentResponse:
     """Run one customer turn through the full v1 pipeline."""
     classifier = classifier or BaselineClassifier()
+    composer = composer or TemplateComposer()
     state = TurnState(raw_text=raw_text, auth_token=auth_token, device_id=device_id)
 
     start = time.perf_counter()
     state = ingest(state)
     state = access_gate(state)
+    state = classify(state, classifier)
+    state = decide_route(state)
 
-    # Unauthenticated callers never reach a model or a tool.
+    # Unauthenticated callers never reach a model or tool.
     if state.access is not None and not state.access.authenticated:
-        state.classification = classifier.classify(state.text)
-        state.route = router.route(state.classification)
-        response = respond_or_handoff(state)
+        response = _escalate(state, reason="unauthenticated")
+    elif state.route and state.route.disposition == Disposition.ESCALATE:
+        response = _escalate(state, reason=state.route.reason)
     else:
-        state = classify(state, classifier)
-        state = decide_route(state)
-        if state.route and state.route.disposition == Disposition.RESPOND:
-            state = run_tool(state)
-        response = respond_or_handoff(state)
+        state = run_tool(state)
+        candidate = composer.compose(state)
+        # INDEPENDENT GUARDRAIL: vet the candidate before it ships.
+        guard = guardrail.check(candidate)
+        if guard.blocked:
+            # A hallucinated offer/price (or tone breach) is escalated to a human.
+            response = _escalate(
+                state,
+                reason="guardrail_block",
+                extra={"violations": guard.violations, "blocked_candidate": candidate},
+            )
+            response.guardrail_action = "block"
+            response.guardrail_violations = guard.violations
+        else:
+            response = _respond(state, guard.text, guard)
 
     response.latency_ms = (time.perf_counter() - start) * 1000
     state.response = response

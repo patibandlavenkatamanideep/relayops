@@ -107,6 +107,8 @@ class AgentResponse:
     tool_results: list[ToolResult] = field(default_factory=list)
     handoff_context: Optional[dict[str, Any]] = None
     latency_ms: float = 0.0
+    guardrail_action: str = "pass"          # pass | redact | block
+    guardrail_violations: list[str] = field(default_factory=list)
 
 
 @dataclass
