@@ -1,0 +1,244 @@
+name: AI PR Review Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "docs/**"
+      - "knowledge_base/**"
+      - "src/**"
+      - "tests/**"
+      - "demo.py"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  relayops-policy-review:
+    name: RelayOps v1.1 PR safety review
+    runs-on: ubuntu-latest
+    env:
+      REVIEW_MARKER: "<!-- relayops-ai-pr-review -->"
+      GEMINI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      RELAYOPS_INTENT_MODEL: ""
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Detect policy-sensitive changes
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+            | sort \
+            | tee /tmp/relayops_changed_files.txt
+
+          match() {
+            if grep -Eq "$1" /tmp/relayops_changed_files.txt; then
+              echo "true"
+            else
+              echo "false"
+            fi
+          }
+
+          access_gate="$(match '^src/access/')"
+          scoped_tools="$(match '^src/mcp/')"
+          guardrails="$(match '^src/guardrails/')"
+          router_or_graph="$(match '^(src/router/|src/graph/)')"
+          evals_or_tests="$(match '^(src/eval/|tests/)')"
+          classifier_metrics="$(match '^(src/router/|src/eval/data/|docs/finetuning.md|README.md)')"
+          readme_claims="$(match '^(README.md|docs/)')"
+
+          run_agent_eval="false"
+          if [[ "$access_gate" == "true" || "$scoped_tools" == "true" || "$guardrails" == "true" || "$router_or_graph" == "true" || "$evals_or_tests" == "true" ]]; then
+            run_agent_eval="true"
+          fi
+
+          run_intent_eval="false"
+          if [[ "$classifier_metrics" == "true" ]]; then
+            run_intent_eval="true"
+          fi
+
+          {
+            echo "access_gate=$access_gate"
+            echo "scoped_tools=$scoped_tools"
+            echo "guardrails=$guardrails"
+            echo "router_or_graph=$router_or_graph"
+            echo "evals_or_tests=$evals_or_tests"
+            echo "classifier_metrics=$classifier_metrics"
+            echo "readme_claims=$readme_claims"
+            echo "run_agent_eval=$run_agent_eval"
+            echo "run_intent_eval=$run_intent_eval"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        id: unit_tests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m unittest | tee /tmp/relayops_unit_tests.txt
+
+      - name: Run deterministic agent eval
+        id: agent_eval
+        if: steps.detect.outputs.run_agent_eval == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m src.eval.run_agent_eval | tee /tmp/relayops_agent_eval.txt
+
+      - name: Skip deterministic agent eval
+        if: steps.detect.outputs.run_agent_eval != 'true'
+        run: |
+          echo "No access/tool/guardrail/router/eval paths changed; agent eval not required." \
+            | tee /tmp/relayops_agent_eval.txt
+
+      - name: Run intent classifier eval
+        id: intent_eval
+        if: steps.detect.outputs.run_intent_eval == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m src.eval.run_intent_eval | tee /tmp/relayops_intent_eval.txt
+
+      - name: Skip intent classifier eval
+        if: steps.detect.outputs.run_intent_eval != 'true'
+        run: |
+          echo "No classifier metrics/model-claim paths changed; intent eval not required." \
+            | tee /tmp/relayops_intent_eval.txt
+
+      - name: Build PR review report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          checkbox() {
+            if [[ "$1" == "true" ]]; then
+              echo "- [x] $2"
+            else
+              echo "- [ ] $2"
+            fi
+          }
+
+          {
+            echo "$REVIEW_MARKER"
+            echo "## RelayOps AI PR Review Agent (v1.1 advisory)"
+            echo
+            echo "This reviewer is CI-only. It is not part of the customer-support runtime,"
+            echo "does not decide customer policy, and does not change code. Deterministic"
+            echo "tests and evals remain the source of truth."
+            echo
+            echo "Policy: docs/ai-pr-review-policy.md"
+            echo
+            echo "### Policy-sensitive surfaces changed"
+            checkbox "${{ steps.detect.outputs.access_gate }}" "Access gate logic"
+            checkbox "${{ steps.detect.outputs.scoped_tools }}" "Scoped MCP-style tools"
+            checkbox "${{ steps.detect.outputs.guardrails }}" "Guardrails"
+            checkbox "${{ steps.detect.outputs.router_or_graph }}" "Router thresholds or graph/pipeline"
+            checkbox "${{ steps.detect.outputs.classifier_metrics }}" "Classifier metrics, dataset, or model claims"
+            checkbox "${{ steps.detect.outputs.readme_claims }}" "README/docs claims"
+            echo
+            echo "### Required evidence"
+            echo "- Access gate changes require unit tests proving unauthenticated and cross-customer behavior."
+            echo "- Scoped tool changes require a scope-violation eval or test."
+            echo "- Guardrail changes require invented-offer and PII/tone coverage."
+            echo "- Router or graph changes require deterministic agent eval."
+            echo "- Classifier metric or README claim changes require eval command/output."
+            echo
+            echo "### CI evidence from this run"
+            echo "- Unit tests: ${{ steps.unit_tests.outcome }}"
+            echo "- Deterministic agent eval required: ${{ steps.detect.outputs.run_agent_eval }}"
+            echo "- Deterministic agent eval outcome: ${{ steps.agent_eval.outcome || 'skipped' }}"
+            echo "- Intent classifier eval required: ${{ steps.detect.outputs.run_intent_eval }}"
+            echo "- Intent classifier eval outcome: ${{ steps.intent_eval.outcome || 'skipped' }}"
+            echo
+            echo "### Changed files"
+            sed 's/^/- `/' /tmp/relayops_changed_files.txt | sed 's/$/`/'
+          } > /tmp/relayops_ai_pr_review_comment.md
+
+          cat /tmp/relayops_ai_pr_review_comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update PR review comment
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = process.env.REVIEW_MARKER;
+            const body = fs.readFileSync("/tmp/relayops_ai_pr_review_comment.md", "utf8");
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const previous = comments.data.find((comment) =>
+              comment.user.type === "Bot" && comment.body.includes(marker)
+            );
+
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+
+      - name: Enforce deterministic checks
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          failed="false"
+
+          if [[ "${{ steps.unit_tests.outcome }}" != "success" ]]; then
+            echo "Unit tests failed."
+            failed="true"
+          fi
+
+          if [[ "${{ steps.detect.outputs.run_agent_eval }}" == "true" && "${{ steps.agent_eval.outcome }}" != "success" ]]; then
+            echo "Required deterministic agent eval failed."
+            failed="true"
+          fi
+
+          if [[ "${{ steps.detect.outputs.run_intent_eval }}" == "true" && "${{ steps.intent_eval.outcome }}" != "success" ]]; then
+            echo "Required intent classifier eval failed."
+            failed="true"
+          fi
+
+          if [[ "$failed" == "true" ]]; then
+            exit 1
+          fi

@@ -104,6 +104,7 @@ Final: human handoff; made-up offer never reaches the customer
 | Per-turn latency tracking | Built |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
+| AI-assisted PR safety reviewer | Built as CI-only v1.1 workflow |
 | MCP transport wrapper | Designed; tool bodies already scoped |
 | Token/cost dashboards | Designed only |
 | Voice, event bus, canary rollout | Designed only |
@@ -186,6 +187,16 @@ Or keep keys in a gitignored `.env` (auto-loaded by the eval runners):
 cp .env.example .env   # then fill in GEMINI_API_KEY, and run the eval normally
 python3 -m src.eval.run_agent_eval
 ```
+
+Review risky PRs with the CI-only AI PR Review Agent policy:
+
+```bash
+# Runs automatically on pull requests through .github/workflows/ai-pr-review.yml
+# Policy: docs/ai-pr-review-policy.md
+```
+
+The PR reviewer is advisory. It never runs in the customer-support runtime and
+never overrides deterministic tests or evals.
 
 ## Agent evaluation (adversarial + LLM-as-judge)
 
