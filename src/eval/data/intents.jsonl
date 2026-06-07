@@ -1,0 +1,180 @@
+{"text": "reset my router", "intent": "reset_device"}
+{"text": "can you reboot my modem", "intent": "reset_device"}
+{"text": "please restart my device", "intent": "reset_device"}
+{"text": "power cycle the router", "intent": "reset_device"}
+{"text": "my internet is down", "intent": "reset_device"}
+{"text": "wifi is dead", "intent": "reset_device"}
+{"text": "my connection dropped", "intent": "reset_device"}
+{"text": "nothing loads", "intent": "reset_device"}
+{"text": "the wifi went out", "intent": "reset_device"}
+{"text": "my broadband died", "intent": "reset_device"}
+{"text": "can't get online", "intent": "reset_device"}
+{"text": "no internet since this morning", "intent": "reset_device"}
+{"text": "my modem light is red", "intent": "reset_device"}
+{"text": "turn my router off and on", "intent": "reset_device"}
+{"text": "my home wifi quit", "intent": "reset_device"}
+{"text": "I have no internet", "intent": "reset_device"}
+{"text": "the wifi isn't reaching my devices", "intent": "reset_device"}
+{"text": "browser says no connection", "intent": "reset_device"}
+{"text": "my service just cut out", "intent": "reset_device"}
+{"text": "internet keeps cutting out", "intent": "reset_device"}
+{"text": "wifi has no signal anywhere", "intent": "reset_device"}
+{"text": "the router needs a kick", "intent": "reset_device"}
+{"text": "my web pages won't load", "intent": "reset_device"}
+{"text": "connection failed and stays down", "intent": "reset_device"}
+{"text": "internet went dark", "intent": "reset_device"}
+{"text": "my wifi won't connect anymore", "intent": "reset_device"}
+{"text": "router stopped giving internet", "intent": "reset_device"}
+{"text": "everything lost connection", "intent": "reset_device"}
+{"text": "my devices can't reach the internet", "intent": "reset_device"}
+{"text": "the connection is totally dead", "intent": "reset_device"}
+{"text": "is my router online", "intent": "device_status"}
+{"text": "what's the status of my devices", "intent": "device_status"}
+{"text": "are my devices connected", "intent": "device_status"}
+{"text": "is my phone showing as active", "intent": "device_status"}
+{"text": "check if my modem is up", "intent": "device_status"}
+{"text": "is everything online on my account", "intent": "device_status"}
+{"text": "show me my device status", "intent": "device_status"}
+{"text": "is my router working right now", "intent": "device_status"}
+{"text": "are all my devices connected", "intent": "device_status"}
+{"text": "tell me if my device is online", "intent": "device_status"}
+{"text": "current status of my router", "intent": "device_status"}
+{"text": "is my equipment up", "intent": "device_status"}
+{"text": "did my device come back online", "intent": "device_status"}
+{"text": "status check on my devices", "intent": "device_status"}
+{"text": "did everything come back up", "intent": "device_status"}
+{"text": "is the connection good now", "intent": "device_status"}
+{"text": "can you see my equipment on your end", "intent": "device_status"}
+{"text": "is my service active", "intent": "device_status"}
+{"text": "are we connected again", "intent": "device_status"}
+{"text": "is my box reachable", "intent": "device_status"}
+{"text": "what state is my router in", "intent": "device_status"}
+{"text": "is my gateway up", "intent": "device_status"}
+{"text": "is my modem reporting in", "intent": "device_status"}
+{"text": "are my devices showing connected", "intent": "device_status"}
+{"text": "confirm my router is online", "intent": "device_status"}
+{"text": "is my line active", "intent": "device_status"}
+{"text": "does my account show any devices online", "intent": "device_status"}
+{"text": "is my internet up on your side", "intent": "device_status"}
+{"text": "are things back to normal now", "intent": "device_status"}
+{"text": "verify my device connection", "intent": "device_status"}
+{"text": "how long does a reset take", "intent": "device_faq"}
+{"text": "why does my router keep going offline", "intent": "device_faq"}
+{"text": "how do I improve my wifi signal", "intent": "device_faq"}
+{"text": "what does resetting my device do", "intent": "device_faq"}
+{"text": "why is my connection so slow", "intent": "device_faq"}
+{"text": "how often should I reboot my router", "intent": "device_faq"}
+{"text": "what should I do if there's an outage", "intent": "device_faq"}
+{"text": "how do I check for outages in my area", "intent": "device_faq"}
+{"text": "why does my device drop overnight", "intent": "device_faq"}
+{"text": "what causes my router to disconnect", "intent": "device_faq"}
+{"text": "how can I make my wifi faster", "intent": "device_faq"}
+{"text": "steps to fix a weak signal", "intent": "device_faq"}
+{"text": "guide to troubleshooting connection drops", "intent": "device_faq"}
+{"text": "what is a power cycle", "intent": "device_faq"}
+{"text": "does a reboot delete my settings", "intent": "device_faq"}
+{"text": "will resetting lose my configuration", "intent": "device_faq"}
+{"text": "how do I know if it's an outage or my equipment", "intent": "device_faq"}
+{"text": "explain why my speeds drop in the evening", "intent": "device_faq"}
+{"text": "what's the best place to put my router", "intent": "device_faq"}
+{"text": "how do firmware updates work", "intent": "device_faq"}
+{"text": "is it normal for the router to restart itself", "intent": "device_faq"}
+{"text": "tips for a more stable connection", "intent": "device_faq"}
+{"text": "why do I get buffering at night", "intent": "device_faq"}
+{"text": "how far does wifi reach", "intent": "device_faq"}
+{"text": "what channel should my router use", "intent": "device_faq"}
+{"text": "why is my upload slower than download", "intent": "device_faq"}
+{"text": "how do I find my wifi password", "intent": "device_faq"}
+{"text": "what do the lights on my router mean", "intent": "device_faq"}
+{"text": "how do I reduce interference", "intent": "device_faq"}
+{"text": "when should I replace my router", "intent": "device_faq"}
+{"text": "I want a refund on my last bill", "intent": "billing"}
+{"text": "why was I charged twice", "intent": "billing"}
+{"text": "can I upgrade my plan", "intent": "billing"}
+{"text": "what's the price of the premium plan", "intent": "billing"}
+{"text": "I need to update my payment method", "intent": "billing"}
+{"text": "my invoice looks wrong", "intent": "billing"}
+{"text": "cancel my subscription", "intent": "billing"}
+{"text": "how much is my monthly bill", "intent": "billing"}
+{"text": "dispute a charge on my account", "intent": "billing"}
+{"text": "change my billing date", "intent": "billing"}
+{"text": "I was overcharged this month", "intent": "billing"}
+{"text": "downgrade my plan please", "intent": "billing"}
+{"text": "when is my payment due", "intent": "billing"}
+{"text": "remove a fee from my bill", "intent": "billing"}
+{"text": "money came out that shouldn't have", "intent": "billing"}
+{"text": "you billed me for something I cancelled", "intent": "billing"}
+{"text": "give me my money back", "intent": "billing"}
+{"text": "update the card on file", "intent": "billing"}
+{"text": "switch me to the cheaper tier", "intent": "billing"}
+{"text": "there's an extra line item I don't recognize", "intent": "billing"}
+{"text": "stop auto-renewing my account", "intent": "billing"}
+{"text": "what am I paying for exactly", "intent": "billing"}
+{"text": "my bill went up this month", "intent": "billing"}
+{"text": "add a discount to my account", "intent": "billing"}
+{"text": "I never authorized this payment", "intent": "billing"}
+{"text": "break down my charges for me", "intent": "billing"}
+{"text": "can I get a credit for the outage", "intent": "billing"}
+{"text": "why is there a late fee", "intent": "billing"}
+{"text": "change my plan to unlimited", "intent": "billing"}
+{"text": "how do I pay my balance", "intent": "billing"}
+{"text": "hi", "intent": "greeting"}
+{"text": "hello there", "intent": "greeting"}
+{"text": "hey", "intent": "greeting"}
+{"text": "good morning", "intent": "greeting"}
+{"text": "hi, how are you", "intent": "greeting"}
+{"text": "hello, can you help me", "intent": "greeting"}
+{"text": "hey there, quick question", "intent": "greeting"}
+{"text": "good evening", "intent": "greeting"}
+{"text": "hiya", "intent": "greeting"}
+{"text": "morning!", "intent": "greeting"}
+{"text": "hello team", "intent": "greeting"}
+{"text": "hey, you there?", "intent": "greeting"}
+{"text": "hi friend", "intent": "greeting"}
+{"text": "greetings", "intent": "greeting"}
+{"text": "yo", "intent": "greeting"}
+{"text": "howdy", "intent": "greeting"}
+{"text": "good afternoon", "intent": "greeting"}
+{"text": "hello, anyone available", "intent": "greeting"}
+{"text": "hey hey", "intent": "greeting"}
+{"text": "hi, hope you're well", "intent": "greeting"}
+{"text": "well hello", "intent": "greeting"}
+{"text": "hey support", "intent": "greeting"}
+{"text": "hello?", "intent": "greeting"}
+{"text": "hi there, got a sec", "intent": "greeting"}
+{"text": "good day", "intent": "greeting"}
+{"text": "hey, how's it going", "intent": "greeting"}
+{"text": "hello, nice to meet you", "intent": "greeting"}
+{"text": "hi, thanks for helping", "intent": "greeting"}
+{"text": "hey, are you available", "intent": "greeting"}
+{"text": "oh hi", "intent": "greeting"}
+{"text": "what's the weather today", "intent": "unknown"}
+{"text": "tell me a joke", "intent": "unknown"}
+{"text": "do you sell phones", "intent": "unknown"}
+{"text": "what time do you open", "intent": "unknown"}
+{"text": "can I speak to a human", "intent": "unknown"}
+{"text": "where is your office located", "intent": "unknown"}
+{"text": "what's your favorite color", "intent": "unknown"}
+{"text": "is the moon out tonight", "intent": "unknown"}
+{"text": "recommend a good restaurant", "intent": "unknown"}
+{"text": "asdfghjkl", "intent": "unknown"}
+{"text": "I love pizza", "intent": "unknown"}
+{"text": "who won the game last night", "intent": "unknown"}
+{"text": "translate hello to french", "intent": "unknown"}
+{"text": "what's 2 plus 2", "intent": "unknown"}
+{"text": "are you a robot", "intent": "unknown"}
+{"text": "tell me about your company history", "intent": "unknown"}
+{"text": "do you have any job openings", "intent": "unknown"}
+{"text": "what's the capital of spain", "intent": "unknown"}
+{"text": "sing me a song", "intent": "unknown"}
+{"text": "how old are you", "intent": "unknown"}
+{"text": "give me stock tips", "intent": "unknown"}
+{"text": "what should I have for lunch", "intent": "unknown"}
+{"text": "do you offer cable tv", "intent": "unknown"}
+{"text": "what's the meaning of life", "intent": "unknown"}
+{"text": "can you write my essay", "intent": "unknown"}
+{"text": "what languages do you speak", "intent": "unknown"}
+{"text": "tell me a fun fact", "intent": "unknown"}
+{"text": "do you like cats or dogs", "intent": "unknown"}
+{"text": "what's trending right now", "intent": "unknown"}
+{"text": "help me plan a vacation", "intent": "unknown"}
