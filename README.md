@@ -2,7 +2,7 @@
 
 **Production-shaped AI customer-service agent for telecom/subscription support.**
 
-Status: **v1 vertical slice working; Qwen LoRA fine-tune trained + evaluated (adapter upload pending).**
+Status: **v1 vertical slice working; Qwen LoRA fine-tune trained, evaluated, and [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).**
 
 RelayOps handles customer chat turns through a deterministic access gate, a tiered
 intent router, scoped tools, hybrid RAG, and an independent guardrail. The built
@@ -72,7 +72,7 @@ Final: human handoff; made-up offer never reaches the customer
 | Keyword baseline | Built/evaluated |
 | Complement NB classifier | Built/evaluated |
 | 2,400-example grouped intent dataset | Built/evaluated |
-| Qwen2.5-1.5B LoRA training path | Built + evaluated; public adapter upload pending |
+| Qwen2.5-1.5B LoRA training path | Built, evaluated, published to Hugging Face |
 | Hybrid RAG with citations | Built |
 | Guardrail for offers/prices, PII, tone | Built |
 | Synchronous graph-shaped pipeline | Built |
@@ -187,7 +187,9 @@ to 0.804 — the paraphrase/slang/mixed-intent robustness a bag-of-words model c
 match. Both stay behind the same `IntentClassifier` interface, so the router swaps
 them without code changes.
 
-Fine-tuned adapter: **evaluated**; public LoRA upload + model card still pending.
+Fine-tuned adapter: **published** at
+[venkatamanideep/relayops-intent-qwen](https://huggingface.co/venkatamanideep/relayops-intent-qwen)
+(load with `RELAYOPS_INTENT_MODEL=venkatamanideep/relayops-intent-qwen`).
 RelayOps fine-tunes a **small open-source model** (Qwen2.5-1.5B), not Claude. See
 [MODEL_CARD.md](MODEL_CARD.md) for the adapter card.
 
