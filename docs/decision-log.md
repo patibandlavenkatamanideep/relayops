@@ -26,9 +26,12 @@ The cheap classifier is load-bearing in the cost story (skips frontier on the ea
 **Date:** June 2026
 The Tier-1 classifier is a fine-tuned small open model, not Claude. Offline, a
 Complement-NB model stands in (beats keyword 0.492→0.932 CV on the 2,400-example
-group-aware paraphrase dataset); the real fine-tune
-recipe + chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship
-for GPU runs, with final LoRA eval pending. Classifiers are switchable via
+group-aware paraphrase dataset). The Qwen2.5-1.5B LoRA fine-tune is now trained +
+evaluated (Colab/Unsloth): held-out 0.999 acc, and on the hand-written adversarial
+set 0.958 acc / 0.804 macro-F1 vs NB's 0.667 / 0.562 — the real generalization win,
+since the synthetic held-out set is easy for any decent learner. Recipe +
+chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship for GPU
+runs; public adapter upload pending. Classifiers are switchable via
 `router.registry.get_classifier`.
 **Why:** Anthropic has no customer fine-tuning of Claude — the honest, stronger
 claim is "fine-tuned a small open model, kept Claude for Tier-2". Refinements on

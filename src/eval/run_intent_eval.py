@@ -41,6 +41,20 @@ def _evaluate(clf, test: list[Example]) -> tuple[list[str], list[str]]:
     return y_true, y_pred
 
 
+def _evaluate_progress(clf, test: list[Example], every: int = 50) -> tuple[list[str], list[str]]:
+    """Like _evaluate but prints progress — the fine-tuned LM runs one call per
+    example, so this shows it's advancing (not hung) on a few-hundred-example set."""
+    y_true: list[str] = []
+    y_pred: list[str] = []
+    n = len(test)
+    for i, ex in enumerate(test, 1):
+        y_true.append(ex.intent.value)
+        y_pred.append(clf.classify(ex.text).intent.value)
+        if i % every == 0 or i == n:
+            print(f"  ...{i}/{n}", flush=True)
+    return y_true, y_pred
+
+
 def _report(name: str, y_true: list[str], y_pred: list[str]) -> float:
     acc = accuracy(y_true, y_pred)
     print(f"\n===== {name} =====")
@@ -89,7 +103,17 @@ def main() -> None:
             from ..router.finetuned_classifier import FineTunedIntentClassifier
 
             finetuned = FineTunedIntentClassifier()
-            _report("fine-tuned (small LM)", *_evaluate(finetuned, test))
+            # The LM runs one generation per example. Optional RELAYOPS_FT_MAX caps
+            # the test set for a fast sanity number before the full run.
+            ft_test = test
+            cap = os.environ.get("RELAYOPS_FT_MAX")
+            if cap:
+                ft_test = test[: int(cap)]
+            print(
+                f"\n[fine-tuned eval: running the LM on {len(ft_test)} test examples"
+                f"{' (capped)' if cap else ''} — a few minutes on a T4]"
+            )
+            _report("fine-tuned (small LM)", *_evaluate_progress(finetuned, ft_test))
         except Exception as e:
             detail = str(e) or repr(e)
             print(f"\n[fine-tuned classifier skipped: {type(e).__name__}: {detail}]")

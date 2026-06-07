@@ -2,7 +2,7 @@
 
 **Production-shaped AI customer-service agent for telecom/subscription support.**
 
-Status: **v1 vertical slice working; Qwen LoRA eval pending.**
+Status: **v1 vertical slice working; Qwen LoRA fine-tune trained + evaluated (adapter upload pending).**
 
 RelayOps handles customer chat turns through a deterministic access gate, a tiered
 intent router, scoped tools, hybrid RAG, and an independent guardrail. The built
@@ -72,7 +72,7 @@ Final: human handoff; made-up offer never reaches the customer
 | Keyword baseline | Built/evaluated |
 | Complement NB classifier | Built/evaluated |
 | 2,400-example grouped intent dataset | Built/evaluated |
-| Qwen2.5-1.5B LoRA training path | Built; final eval pending |
+| Qwen2.5-1.5B LoRA training path | Built + evaluated; public adapter upload pending |
 | Hybrid RAG with citations | Built |
 | Guardrail for offers/prices, PII, tone | Built |
 | Synchronous graph-shaped pipeline | Built |
@@ -150,32 +150,40 @@ The classifier story is model selection, not "I used an LLM." Every classifier
 implements the same `IntentClassifier` interface, so the router can swap them
 without changing pipeline logic.
 
-| Classifier | Cost | 5-seed acc | 5-seed macro-F1 | Role |
-|---|---|---:|---:|---|
-| Keyword baseline | ~$0 | 0.492 | 0.506 | Brittle baseline |
-| Complement NB | ~$0 | **0.932** | **0.931** | Strong offline learned baseline |
-| Qwen2.5-1.5B LoRA | Low | eval pending | eval pending | Trained adapter; eval wrapper debugging |
-| Claude Haiku prompt | Higher | optional | optional | Tier-2/reference baseline |
+| Classifier | Cost | Held-out acc | Held-out macro-F1 | Adversarial acc | Adversarial macro-F1 |
+|---|---|---:|---:|---:|---:|
+| Keyword baseline | ~$0 | 0.506 | 0.516 | 0.250 | 0.242 |
+| Complement NB | ~$0 | 0.933 | 0.932 | 0.667 | 0.562 |
+| Qwen2.5-1.5B LoRA | low | **0.999** | **0.999** | **0.958** | **0.804** |
+| Claude Haiku prompt | high | optional | optional | — | — |
 
-Macro-F1 (every intent weighted equally) is reported alongside accuracy so a model
-can't look good by leaning on easy/over-represented classes.
+Held-out = seed-13 **group-aware** stratified test (726 ex, paraphrase families
+kept whole so they can't straddle train/test); adversarial = 24 hand-written hard
+cases (slang, mixed-intent, out-of-taxonomy). Macro-F1 weights every intent equally
+so a model can't win by leaning on easy classes. Keyword and NB also hold under
+5-seed cross-validation (0.492 / 0.932 acc); prompted Claude Haiku is the optional
+Tier-2 reference (`ANTHROPIC_API_KEY`).
 
-The dataset is 2,400 examples, balanced at 400 examples per intent, with
-group-aware splits so related synthetic paraphrase families do not leak across
-train/test. On the harder adversarial/paraphrase set the gap stays clear but both
-drop: keyword baseline `0.250` acc / `0.242` macro-F1, Complement NB `0.667` acc /
-`0.562` macro-F1 — the headroom the neural fine-tune is meant to close.
+**Reading the numbers honestly.** The held-out set is template-generated synthetic
+data, so high in-distribution scores are expected for any decent learner — even
+with the anti-leakage split — which is why both NB (0.933) and the LoRA (0.999)
+score so high there. The **hand-written adversarial set is the trustworthy
+generalization signal**: the fine-tune clearly wins (0.958 acc) but its macro-F1 of
+0.804 (below its 0.958 accuracy) shows it is still uneven on the hardest classes —
+better than NB's 0.562, not perfect. A fuller claim needs a larger adversarial set
+with per-class recall.
 
-### Why NB Is Not The Final Answer
+### Why the fine-tune earns its place
 
-Complement NB is kept as a strong offline baseline. The Qwen LoRA path exists to
-test whether a small neural classifier handles paraphrase, slang, and mixed-intent
-messages better than bag-of-words models, especially on adversarial examples.
-The README will only claim Qwen is better after the same held-out and adversarial
-evals produce that result.
+Complement NB is a strong, free offline baseline and the right default with no GPU.
+The Qwen LoRA fine-tune is the intended Tier-1 classifier: on the out-of-distribution
+adversarial set it lifts accuracy from NB's 0.667 to 0.958 and macro-F1 from 0.562
+to 0.804 — the paraphrase/slang/mixed-intent robustness a bag-of-words model can't
+match. Both stay behind the same `IntentClassifier` interface, so the router swaps
+them without code changes.
 
-Fine-tuned adapter: LoRA upload/public release pending final eval and model card.
-RelayOps fine-tunes a **small open-source model**, not Claude.
+Fine-tuned adapter: **evaluated**; public LoRA upload + model card still pending.
+RelayOps fine-tunes a **small open-source model** (Qwen2.5-1.5B), not Claude.
 
 ## Architecture
 
