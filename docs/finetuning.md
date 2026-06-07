@@ -34,6 +34,14 @@ RELAYOPS_INTENT_MODEL=models/intent-qwen2.5-1.5b-lora \
   python3 -m src.eval.run_intent_eval        # compares vs keyword + Complement NB
 ```
 
+Downloaded adapters work too:
+```bash
+RELAYOPS_INTENT_MODEL=/path/to/intent-lora.zip python3 -m src.eval.run_intent_eval
+```
+If adapter/base loading fails, add `RELAYOPS_DEBUG=1` for a traceback. To force a
+specific base model instead of the adapter's saved base, set
+`RELAYOPS_INTENT_BASE_MODEL=Qwen/Qwen2.5-1.5B-Instruct`.
+
 ## Dataset format (chat JSONL, one conversation per line)
 ```json
 {"messages":[

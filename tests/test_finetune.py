@@ -10,13 +10,19 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from src.core.models import Intent
 from src.eval.dataset import load_dataset, stratified_split_3way
 from src.eval.export_finetune_data import export
 from src.router.classifier import BaselineClassifier
-from src.router.finetuned_classifier import SYSTEM_PROMPT, parse_intent
+from src.router.finetuned_classifier import (
+    SYSTEM_PROMPT,
+    _materialize_model_path,
+    _model_input_device,
+    parse_intent,
+)
 from src.router.registry import get_classifier
 
 
@@ -72,6 +78,34 @@ class ExportTests(unittest.TestCase):
                 target = json.loads(rec["messages"][2]["content"])
                 self.assertEqual(set(target), {"intent"})
                 self.assertIn(target["intent"], [i.value for i in Intent])
+
+
+class LoaderHelperTests(unittest.TestCase):
+    def test_materialize_zip_adapter(self):
+        tempdirs = []
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                zip_path = Path(d) / "intent-lora.zip"
+                with zipfile.ZipFile(zip_path, "w") as zf:
+                    zf.writestr("adapter_config.json", "{}")
+                    zf.writestr("tokenizer_config.json", "{}")
+
+                resolved = Path(_materialize_model_path(str(zip_path), tempdirs))
+                self.assertTrue((resolved / "adapter_config.json").exists())
+                self.assertTrue((resolved / "tokenizer_config.json").exists())
+        finally:
+            for td in tempdirs:
+                td.cleanup()
+
+    def test_model_input_device_falls_back_to_parameters(self):
+        class Param:
+            device = "cpu"
+
+        class WrappedModel:
+            def parameters(self):
+                yield Param()
+
+        self.assertEqual(_model_input_device(WrappedModel()), "cpu")
 
 
 class RegistryTests(unittest.TestCase):

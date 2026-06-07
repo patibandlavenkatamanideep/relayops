@@ -15,6 +15,7 @@ behind the portfolio claim "I improved routing accuracy from X to Y."
 from __future__ import annotations
 
 import os
+import traceback
 
 from pathlib import Path
 
@@ -78,7 +79,10 @@ def main() -> None:
             finetuned = FineTunedIntentClassifier()
             _report("fine-tuned (small LM)", *_evaluate(finetuned, test))
         except Exception as e:
-            print(f"\n[fine-tuned classifier skipped: {type(e).__name__}: {e}]")
+            detail = str(e) or repr(e)
+            print(f"\n[fine-tuned classifier skipped: {type(e).__name__}: {detail}]")
+            if os.environ.get("RELAYOPS_DEBUG"):
+                print(traceback.format_exc())
             finetuned = None
 
     # Stable headline: 5-seed cross-validation.

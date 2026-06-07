@@ -27,10 +27,15 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import Any
 
 from ..core.models import Classification, Intent
 
 _LABELS = [i.value for i in Intent]
+DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 # Single source of truth — the SAME system prompt is used to build training data
 # (export_finetune_data.py) and at inference, so the fine-tune sees a consistent
@@ -43,6 +48,55 @@ SYSTEM_PROMPT = (
 )
 
 _JSON_OBJ = re.compile(r"\{.*?\}", re.DOTALL)
+
+
+def _safe_extract_zip(zip_path: Path, out_dir: Path) -> None:
+    """Extract a local model zip without allowing paths outside ``out_dir``."""
+    out_root = out_dir.resolve()
+    with zipfile.ZipFile(zip_path) as zf:
+        for member in zf.infolist():
+            target = (out_root / member.filename).resolve()
+            if target != out_root and out_root not in target.parents:
+                raise ValueError(f"unsafe path in model zip: {member.filename!r}")
+        zf.extractall(out_root)
+
+
+def _model_root(path: Path) -> Path:
+    """Return the directory that actually contains model/adapter files."""
+    if (path / "adapter_config.json").exists() or (path / "config.json").exists():
+        return path
+    for child in path.iterdir():
+        if child.is_dir() and (
+            (child / "adapter_config.json").exists() or (child / "config.json").exists()
+        ):
+            return child
+    return path
+
+
+def _materialize_model_path(
+    model_path: str, tempdirs: list[tempfile.TemporaryDirectory]
+) -> str:
+    """Return a loadable model path, extracting local zip adapters if needed."""
+    path = Path(model_path).expanduser()
+    if path.is_file() and path.suffix.lower() == ".zip":
+        tmp = tempfile.TemporaryDirectory(prefix="relayops-intent-lora-")
+        tempdirs.append(tmp)
+        _safe_extract_zip(path, Path(tmp.name))
+        return str(_model_root(Path(tmp.name)))
+    if path.exists():
+        return str(path)
+    return model_path
+
+
+def _model_input_device(model: Any) -> Any:
+    """Find the device for input tensors across Transformers and PEFT wrappers."""
+    device = getattr(model, "device", None)
+    if device is not None:
+        return device
+    try:
+        return next(model.parameters()).device
+    except (AttributeError, StopIteration):
+        return None
 
 
 def parse_intent(raw: str, confidence: float = 0.0) -> Classification:
@@ -81,7 +135,7 @@ class FineTunedIntentClassifier:
     def __init__(
         self,
         model_path: str | None = None,
-        base_model: str = "Qwen/Qwen2.5-1.5B-Instruct",
+        base_model: str | None = None,
         max_new_tokens: int = 24,
     ) -> None:
         import torch  # noqa: F401  (validates the runtime is present)
@@ -89,27 +143,47 @@ class FineTunedIntentClassifier:
 
         # path may be a local directory OR a Hugging Face Hub repo id — both are
         # accepted by from_pretrained.
-        path = model_path or os.environ.get("RELAYOPS_INTENT_MODEL")
+        raw_path = model_path or os.environ.get("RELAYOPS_INTENT_MODEL")
+        self._tempdirs: list[tempfile.TemporaryDirectory] = []
+        path = _materialize_model_path(raw_path, self._tempdirs) if raw_path else None
+        base_override = base_model or os.environ.get("RELAYOPS_INTENT_BASE_MODEL")
         self._max_new_tokens = max_new_tokens
 
         if path:
-            try:
-                self._tokenizer = AutoTokenizer.from_pretrained(path)
-            except Exception:
-                self._tokenizer = AutoTokenizer.from_pretrained(base_model)
+            adapter_config = None
             try:
                 # Try as a LoRA adapter over the base model first.
-                from peft import PeftModel
+                from peft import PeftConfig, PeftModel
 
-                base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
-                self._model = PeftModel.from_pretrained(base, path)
-            except Exception:
+                adapter_config = PeftConfig.from_pretrained(path)
+            except Exception as e:
+                if (Path(path).exists() and (Path(path) / "adapter_config.json").exists()):
+                    raise RuntimeError(f"could not read LoRA adapter config from {path!r}") from e
+
+            if adapter_config is not None:
+                adapter_base = getattr(adapter_config, "base_model_name_or_path", None)
+                base_name = base_override or adapter_base or DEFAULT_BASE_MODEL
+                try:
+                    self._tokenizer = AutoTokenizer.from_pretrained(path)
+                except Exception:
+                    self._tokenizer = AutoTokenizer.from_pretrained(base_name)
+
+                base = AutoModelForCausalLM.from_pretrained(base_name, device_map="auto")
+                try:
+                    self._model = PeftModel.from_pretrained(base, path)
+                except Exception as e:
+                    raise RuntimeError(
+                        f"failed to load LoRA adapter {path!r} over base {base_name!r}"
+                    ) from e
+            else:
                 # Otherwise treat the path/id as a full/merged model.
+                self._tokenizer = AutoTokenizer.from_pretrained(path)
                 self._model = AutoModelForCausalLM.from_pretrained(path, device_map="auto")
         else:
             # No fine-tune available -> base model (still functional, weaker).
-            self._tokenizer = AutoTokenizer.from_pretrained(base_model)
-            self._model = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
+            base_name = base_override or DEFAULT_BASE_MODEL
+            self._tokenizer = AutoTokenizer.from_pretrained(base_name)
+            self._model = AutoModelForCausalLM.from_pretrained(base_name, device_map="auto")
 
         self._model.eval()
 
@@ -122,7 +196,10 @@ class FineTunedIntentClassifier:
         ]
         input_ids = self._tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt"
-        ).to(self._model.device)
+        )
+        device = _model_input_device(self._model)
+        if device is not None:
+            input_ids = input_ids.to(device)
 
         gen = self._model.generate(
             input_ids=input_ids,
