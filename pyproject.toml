@@ -37,6 +37,11 @@ dev = [
 embeddings = [
     "voyageai>=0.3",
 ]
+# LLM-as-judge providers (Step 5). Anthropic is already a core dep; add Gemini for
+# a cross-family judge. Without either key the agent eval runs deterministic-only.
+judge = [
+    "google-genai>=0.3",
+]
 # Fine-tuning the Tier-1 intent classifier (Unsloth + LoRA) and serving it.
 # GPU recommended for training. Without this the classifier registry's
 # "finetuned" option is unavailable and eval uses keyword / Complement NB.

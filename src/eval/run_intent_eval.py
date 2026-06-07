@@ -84,6 +84,10 @@ def _cv_metrics(data, build_clf) -> tuple[float, float]:
 
 
 def main() -> None:
+    from ..core.env import load_env
+
+    load_env()  # pick up ANTHROPIC_API_KEY / RELAYOPS_INTENT_MODEL from .env
+
     data = load_dataset()
     train, test = stratified_split(data, test_frac=0.3, seed=13)
     print(f"dataset: {len(data)} examples  |  train: {len(train)}  test: {len(test)}")

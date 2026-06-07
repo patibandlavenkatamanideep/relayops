@@ -19,16 +19,21 @@ from .agent_cases import CASES, deterministic_failures, run_case
 
 
 def main() -> None:
-    judge = None
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            from .judge import LLMJudge
+    from ..core.env import load_env
 
-            judge = LLMJudge()
-        except Exception as e:
-            print(f"[LLM judge unavailable: {type(e).__name__}: {e}]")
-            if os.environ.get("RELAYOPS_DEBUG"):
-                traceback.print_exc()
+    load_env()  # pick up GEMINI_API_KEY / ANTHROPIC_API_KEY from .env
+
+    judge = None
+    try:
+        from .judge import get_judge
+
+        judge = get_judge()
+        if judge is not None:
+            print(f"LLM-judge: {judge.name}")
+    except Exception as e:
+        print(f"[LLM judge unavailable: {type(e).__name__}: {e}]")
+        if os.environ.get("RELAYOPS_DEBUG"):
+            traceback.print_exc()
 
     det_pass = 0
     judge_pass = 0
@@ -59,9 +64,9 @@ def main() -> None:
     print(f"deterministic checks: {det_pass}/{len(CASES)} cases pass")
     if judge is not None:
         mean = sum(judge_scores) / len(judge_scores) if judge_scores else 0.0
-        print(f"LLM-judge: {judge_pass}/{len(CASES)} pass, mean score {mean:.1f}/5")
+        print(f"LLM-judge ({judge.name}): {judge_pass}/{len(CASES)} pass, mean score {mean:.1f}/5")
     else:
-        print("LLM-judge: skipped (set ANTHROPIC_API_KEY to enable)")
+        print("LLM-judge: skipped (set GEMINI_API_KEY or ANTHROPIC_API_KEY to enable)")
 
 
 if __name__ == "__main__":

@@ -153,7 +153,15 @@ Evaluate the **agent end-to-end** (adversarial cases + optional LLM-judge):
 
 ```bash
 python3 -m src.eval.run_agent_eval            # deterministic checks, offline
-ANTHROPIC_API_KEY=... python3 -m src.eval.run_agent_eval   # + Claude LLM-judge
+GEMINI_API_KEY=...    python3 -m src.eval.run_agent_eval   # + Gemini judge (cross-family)
+ANTHROPIC_API_KEY=... python3 -m src.eval.run_agent_eval   # + Claude judge
+```
+
+Or keep keys in a gitignored `.env` (auto-loaded by the eval runners):
+
+```bash
+cp .env.example .env   # then fill in GEMINI_API_KEY, and run the eval normally
+python3 -m src.eval.run_agent_eval
 ```
 
 ## Agent evaluation (adversarial + LLM-as-judge)
@@ -165,9 +173,12 @@ agent's **final behaviour**, two layers deep:
 - **Deterministic checks (offline backbone)** — assert disposition, server-side
   scope refusal, grounded citations, correct escalation reason, and forbidden
   content. **7/7 pass.** These are the load-bearing safety properties.
-- **LLM-as-judge (optional, Claude)** — scores the subjective layer a rule can't:
-  groundedness, safe tone, whether a handoff reads as helpful. Runs only with
-  `ANTHROPIC_API_KEY`; the verdict parser is unit-tested offline.
+- **LLM-as-judge (optional, provider-pluggable)** — scores the subjective layer a
+  rule can't: groundedness, safe tone, whether a handoff reads as helpful.
+  Supports **Gemini** and **Claude**, auto-selected by which key is set
+  (`RELAYOPS_JUDGE_PROVIDER` overrides). A **cross-family** judge (Gemini grading
+  an agent that may use Claude) is preferred — it avoids self-preference bias. The
+  verdict parser is unit-tested offline.
 
 Cases include: cross-customer device reset (must refuse server-side + not leak
 data), invented offer (guardrail must block before it ships), money-touching
