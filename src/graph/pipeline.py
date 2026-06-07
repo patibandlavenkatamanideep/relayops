@@ -31,8 +31,23 @@ from ..core.models import (
 )
 from ..guardrails import guardrail
 from ..mcp import tools
+from ..rag.retriever import HybridRetriever
+from ..rag.store import load_chunks
 from ..router import router
 from ..router.classifier import BaselineClassifier, IntentClassifier
+
+# Number of cited chunks to retrieve for an FAQ answer.
+_RAG_K = 2
+
+# Lazily-built retriever; the KB is loaded once per process.
+_retriever: HybridRetriever | None = None
+
+
+def _get_retriever() -> HybridRetriever:
+    global _retriever
+    if _retriever is None:
+        _retriever = HybridRetriever(load_chunks())
+    return _retriever
 
 
 # --- nodes ---------------------------------------------------------------------
@@ -89,6 +104,12 @@ def run_tool(state: TurnState) -> TurnState:
     return state
 
 
+def retrieve(state: TurnState) -> TurnState:
+    """RAG node: pull cited, grounded facts for an informational turn."""
+    state.retrieved = _get_retriever().search(state.text, k=_RAG_K)
+    return state
+
+
 # --- composer (Tier 1/2 stand-in) ----------------------------------------------
 
 
@@ -116,6 +137,16 @@ class TemplateComposer:
                 "I wasn't able to reset that device just now. Let me get a "
                 "specialist to take a look."
             )
+
+        if intent == Intent.DEVICE_FAQ:
+            # Grounded answer: stitch retrieved chunks with [n] citation markers
+            # and a Sources list. The real Tier 2 model would synthesise here;
+            # the template keeps the answer strictly traceable to the KB.
+            body = " ".join(f"{r.text} [{i}]" for i, r in enumerate(state.retrieved, 1))
+            sources = "\n".join(
+                f"[{i}] {r.title} ({r.source})" for i, r in enumerate(state.retrieved, 1)
+            )
+            return f"{body}\n\nSources:\n{sources}"
 
         if intent == Intent.DEVICE_STATUS:
             res = state.tool_results[-1] if state.tool_results else None
@@ -162,6 +193,10 @@ def _escalate(state: TurnState, reason: str, extra: dict | None = None) -> Agent
 
 def _respond(state: TurnState, text: str, guard: guardrail.GuardrailResult) -> AgentResponse:
     assert state.classification is not None and state.route is not None
+    citations = [
+        {"n": i, "title": r.title, "source": r.source, "doc_id": r.doc_id}
+        for i, r in enumerate(state.retrieved, 1)
+    ]
     return AgentResponse(
         text=text,
         intent=state.classification.intent,
@@ -170,6 +205,7 @@ def _respond(state: TurnState, text: str, guard: guardrail.GuardrailResult) -> A
         tool_results=state.tool_results,
         guardrail_action=guard.action,
         guardrail_violations=guard.violations,
+        citations=citations,
     )
 
 
@@ -201,6 +237,14 @@ def handle_turn(
         response = _escalate(state, reason=state.route.reason)
     else:
         state = run_tool(state)
+        if state.route and state.route.retrieve:
+            state = retrieve(state)
+            # No grounding found -> don't answer from nothing; escalate.
+            if not state.retrieved:
+                response = _escalate(state, reason="unverifiable")
+                response.latency_ms = (time.perf_counter() - start) * 1000
+                state.response = response
+                return response
         candidate = composer.compose(state)
         # INDEPENDENT GUARDRAIL: vet the candidate before it ships.
         guard = guardrail.check(candidate)

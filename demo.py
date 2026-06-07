@@ -37,6 +37,8 @@ def show(title: str, **kwargs) -> None:
     )
     for r in resp.tool_results:
         print(f"          tool -> ok={r.ok} data={r.data or r.error}")
+    for c in resp.citations:
+        print(f"          cite -> [{c['n']}] {c['title']} ({c['source']})")
     if resp.handoff_context:
         print(f"          handoff -> {resp.handoff_context}")
 
@@ -65,6 +67,20 @@ def main() -> None:
         raw_text="my router isn't working, can you reset it?",
         auth_token="tok_alice",
         composer=HallucinatingComposer(),
+    )
+
+    # 2c. RAG: an informational question is answered from the KB WITH citations.
+    show(
+        "FAQ answered from RAG with citations",
+        raw_text="how long does a device reset take?",
+        auth_token="tok_alice",
+    )
+
+    # 2d. Grounding: a question the KB can't answer -> escalate, don't make it up.
+    show(
+        "Unverifiable FAQ -> escalate (no grounding)",
+        raw_text="how do I set up international roaming in Antarctica?",
+        auth_token="tok_alice",
     )
 
     # 3. Escalation: billing is money-touching -> always handed to a human.

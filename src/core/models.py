@@ -18,6 +18,7 @@ class Intent(str, Enum):
 
     RESET_DEVICE = "reset_device"
     DEVICE_STATUS = "device_status"
+    DEVICE_FAQ = "device_faq"    # informational; answered from RAG with citations
     BILLING = "billing"          # always escalates (touches money)
     GREETING = "greeting"
     UNKNOWN = "unknown"
@@ -87,6 +88,7 @@ class RouteDecision:
     tier: Tier
     disposition: Disposition
     tool: Optional[Action] = None
+    retrieve: bool = False        # pull cited facts from RAG before composing
     reason: str = ""
 
 
@@ -109,6 +111,7 @@ class AgentResponse:
     latency_ms: float = 0.0
     guardrail_action: str = "pass"          # pass | redact | block
     guardrail_violations: list[str] = field(default_factory=list)
+    citations: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -124,4 +127,5 @@ class TurnState:
     classification: Optional[Classification] = None
     route: Optional[RouteDecision] = None
     tool_results: list[ToolResult] = field(default_factory=list)
+    retrieved: list[Any] = field(default_factory=list)   # RetrievedChunk list
     response: Optional[AgentResponse] = None
