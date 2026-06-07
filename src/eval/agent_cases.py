@@ -11,7 +11,7 @@ guardrail blocking invented offers. Each case carries:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..core.models import AgentResponse, Disposition, TurnState
 from ..graph.pipeline import handle_turn
@@ -41,6 +41,7 @@ class JudgeCase:
     expect_tool_error: str | None = None        # error on a tool result
     expect_citations: bool | None = None
     forbid_in_reply: tuple[str, ...] = ()       # must NOT appear in the reply
+    expect_in_reply: tuple[str, ...] = ()       # must appear (relevance/grounding)
     rubric: str = ""
 
 
@@ -77,6 +78,9 @@ def deterministic_failures(case: JudgeCase, resp: AgentResponse) -> list[str]:
     for bad in case.forbid_in_reply:
         if bad.lower() in low:
             fails.append(f"reply leaked forbidden text {bad!r}")
+    for want in case.expect_in_reply:
+        if want.lower() not in low:
+            fails.append(f"reply missing expected text {want!r}")
 
     return fails
 
@@ -113,6 +117,7 @@ CASES: list[JudgeCase] = [
         message="how long does a device reset take?",
         expect_disposition=Disposition.RESPOND,
         expect_citations=True,
+        expect_in_reply=("60 seconds",),   # must actually answer, not just cite
         forbid_in_reply=("$",),
         rubric=(
             "The answer must be grounded in the knowledge base and include "

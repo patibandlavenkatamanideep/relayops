@@ -13,6 +13,19 @@ unsafe, ungrounded, or low-confidence turns are handed to a human.
      then uncomment the line below:
 ![RelayOps demo](docs/assets/relayops-demo.gif) -->
 
+## Results
+
+| What | Result |
+|---|---|
+| Intent classifier (held-out / adversarial acc) | keyword 0.49 → Complement NB 0.93 → **Qwen LoRA 0.999 / 0.958** |
+| Agent safety (deterministic adversarial checks) | **7/7 pass** |
+| Agent response quality (cross-family Gemini LLM-judge) | **mean 4.6/5** |
+| Fine-tuned adapter | [published on Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen) |
+| Live demo | Streamlit UI, deployable to Railway |
+
+Detail in [Intent Classifier](#intent-classifier) and [Agent evaluation](#agent-evaluation-adversarial--llm-as-judge)
+below — including the honest synthetic-data caveat and a real gap the judge caught.
+
 ## Demo Proof
 
 Run:
@@ -199,12 +212,18 @@ greeting_simple_reply          pass (5/5)  short helpful reply, no escalation
 faq_grounded_with_citations    fail (2/5)  cited sources, but didn't directly answer the question
 ```
 
-The lone failure is the **judge catching a real gap a rule couldn't**: the FAQ
-reply surfaced grounded, cited snippets but didn't synthesise a targeted answer
-("about 60 seconds" exists in the KB, but retrieval ranked a troubleshooting chunk
-first). The v1 **template composer stitches snippets rather than answering** — the
-deferred Tier-2 LLM composer closes this. Exactly the kind of relevance miss an
-"are citations present?" assertion passes but a judge flags.
+The lone failure was the **judge catching a real gap a rule couldn't**: the FAQ
+reply cited the right article but led with a troubleshooting chunk instead of the
+answer ("about 60 seconds" was in the KB but ranked third — the query said "take",
+the chunk said "takes", and there was no stemming).
+
+**Fixed, and guarded against regression:** added light stemming so the timing
+chunk now ranks first (the reply leads with "A reset usually takes about 60
+seconds…"), plus a deterministic `expect_in_reply` assertion so an answer that
+cites-but-doesn't-answer now fails the offline suite too. Re-run the Gemini judge
+to confirm the lifted FAQ score. This is the loop working end to end: the judge
+surfaced a relevance miss an "are citations present?" check passed, and it drove a
+real fix.
 
 ## Intent Classifier
 
@@ -296,9 +315,10 @@ tool/RAG/guardrail → respond-or-handoff:
   are routing-slice validation, not a production benchmark.
 - Adversarial set is small today (24 hand-written cases); no per-class adversarial
   recall yet.
-- The FAQ composer **stitches retrieved snippets** (with citations) rather than
-  synthesising a targeted answer — the LLM-judge flags this; the deferred Tier-2
-  LLM composer is the fix.
+- The FAQ composer is **extractive** — it ranks and stitches grounded snippets
+  (now leading with the best-matching one) rather than synthesising prose. Good
+  enough for direct-lookup questions; multi-part questions need the deferred
+  Tier-2 LLM composer.
 - The demo runs a local **synchronous** pipeline, not event-driven production infra.
 - MCP transport wrapper, token/cost dashboards, voice, and shadow→canary rollout
   are designed but deferred (see [DESIGN.md](DESIGN.md)).

@@ -40,8 +40,17 @@ _STOP = frozenset(
 )
 
 
+def _stem(w: str) -> str:
+    """Minimal, consistent plural/3rd-person stem: strip a single trailing 's' so
+    'takes'->'take', 'devices'->'device'. Deliberately tiny (no 'es'/'ing' rules)
+    to avoid singular/plural mismatches like 'devices'->'devic' vs 'device'."""
+    if len(w) >= 4 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
 def tokenize(text: str) -> list[str]:
-    return [t for t in _TOKEN.findall(text.lower()) if t not in _STOP]
+    return [_stem(t) for t in _TOKEN.findall(text.lower()) if t not in _STOP]
 
 
 # --- protocol ------------------------------------------------------------------
