@@ -130,7 +130,7 @@ class TemplateComposer:
             res = state.tool_results[-1] if state.tool_results else None
             if res and res.ok:
                 return (
-                    f"Done — I reset your {res.data['name']} and it's back online. "
+                    f"Done — I reset {res.data['name']} and it's back online. "
                     "Give it about 60 seconds to reconnect. Anything else?"
                 )
             return (

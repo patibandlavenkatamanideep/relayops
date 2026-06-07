@@ -9,6 +9,10 @@ intent router, scoped tools, hybrid RAG, and an independent guardrail. The built
 slice focuses on one end-to-end action - **reset my device** - while billing,
 unsafe, ungrounded, or low-confidence turns are handed to a human.
 
+<!-- Add a demo GIF/screenshot of the Streamlit UI (or the Railway deployment),
+     then uncomment the line below:
+![RelayOps demo](docs/assets/relayops-demo.gif) -->
+
 ## Demo Proof
 
 Run:
@@ -36,8 +40,8 @@ Intent classifier: reset_device
 Router: tier2 + device_reset
 Tool: device_reset(customer_scope=cust_alice, device=dev_a1) -> ok
 Guardrail: pass
-Final: "Done - I reset your Alice's Router and it's back online..."
-Latency: ~1ms in the local deterministic demo
+Final: "Done — I reset Alice's Router and it's back online..."
+Latency: ~1ms in the local deterministic demo path (excludes LLM inference)
 ```
 
 Sample trace - billing / offer safety:
@@ -227,6 +231,19 @@ tool/RAG/guardrail → respond-or-handoff:
 > (whose confidence comes from token probabilities) route cleanly — so keyword is
 > the UI default today. Calibrating NB's confidence to the router threshold is a
 > tracked follow-up.
+
+## Limitations
+
+- Dataset is synthetic / paraphrase-rich, not real telecom logs — held-out scores
+  are routing-slice validation, not a production benchmark.
+- Adversarial set is small today (24 hand-written cases); no per-class adversarial
+  recall yet.
+- The demo runs a local **synchronous** pipeline, not event-driven production infra.
+- MCP transport wrapper, token/cost dashboards, voice, and shadow→canary rollout
+  are designed but deferred (see [DESIGN.md](DESIGN.md)).
+- Complement NB over-escalates in the live pipeline (softmax confidence below the
+  router's 0.55 threshold) — keyword is the UI routing default; NB confidence
+  calibration is a tracked follow-up.
 
 ## Architecture
 
