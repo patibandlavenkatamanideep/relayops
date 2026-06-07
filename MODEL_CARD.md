@@ -55,22 +55,25 @@ telecom intents over synthetic data.
 | Split | Accuracy | Macro-F1 |
 |---|---:|---:|
 | Held-out (seed-13, group-aware, 726 ex) | 0.999 | 0.999 |
-| Hand-written adversarial / paraphrase (24 ex) | 0.958 | 0.804 |
+| Legacy hand-written adversarial / paraphrase (24 ex) | 0.958 | 0.804 |
+| v1.2 hand-written adversarial / safety set (100 ex) | pending rerun | pending rerun |
 
-Baselines on the same sets: keyword 0.506 / 0.250 acc; Complement NB 0.933 / 0.667 acc.
+Baselines on the legacy 24-case adversarial set: keyword 0.250 acc; Complement
+NB 0.667 acc. On the v1.2 100-case adversarial set, keyword is 0.490 acc,
+Complement NB is 0.660 acc, and safe calibrated NB is 0.880 acc.
 
 **Honest caveat.** The held-out set is template-generated synthetic data, so high
 in-distribution scores are expected even with anti-leakage splits. Treat the
 held-out number as routing-slice validation, not a production benchmark; the
-adversarial set is the truer generalization signal, and the adversarial macro-F1
-(0.804 < 0.958 accuracy) shows the model is still uneven on the hardest classes.
+adversarial set is the truer generalization signal. The v1.2 repo now has a
+larger 100-case adversarial/safety set; the Qwen rerun is intentionally marked
+pending until measured on that exact set.
 
 ## Limitations
 - Trained on synthetic telecom data for six intents; not a general intent model.
 - Out-of-taxonomy / mixed-intent / abusive messages map to `unknown`, which RelayOps
   escalates — the model does not resolve them.
-- Adversarial set is small (24); per-class adversarial recall and a larger set are
-  follow-ups.
+- Qwen has not yet been rerun on RelayOps' newer 100-case adversarial/safety set.
 
 ## How to use (in RelayOps)
 ```bash

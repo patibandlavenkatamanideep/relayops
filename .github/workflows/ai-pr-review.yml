@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   relayops-policy-review:
-    name: RelayOps v1.1 PR safety review
+    name: RelayOps PR safety review
     runs-on: ubuntu-latest
     env:
       REVIEW_MARKER: "<!-- relayops-ai-pr-review -->"
@@ -78,6 +78,11 @@ jobs:
             run_intent_eval="true"
           fi
 
+          run_calibration_eval="false"
+          if [[ "$classifier_metrics" == "true" || "$router_or_graph" == "true" || "$evals_or_tests" == "true" ]]; then
+            run_calibration_eval="true"
+          fi
+
           {
             echo "access_gate=$access_gate"
             echo "scoped_tools=$scoped_tools"
@@ -88,6 +93,7 @@ jobs:
             echo "readme_claims=$readme_claims"
             echo "run_agent_eval=$run_agent_eval"
             echo "run_intent_eval=$run_intent_eval"
+            echo "run_calibration_eval=$run_calibration_eval"
           } >> "$GITHUB_OUTPUT"
 
       - name: Run unit tests
@@ -124,6 +130,20 @@ jobs:
         run: |
           echo "No classifier metrics/model-claim paths changed; intent eval not required." \
             | tee /tmp/relayops_intent_eval.txt
+
+      - name: Run calibration and route-safety eval
+        id: calibration_eval
+        if: steps.detect.outputs.run_calibration_eval == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m src.eval.eval_calibration | tee /tmp/relayops_calibration_eval.txt
+
+      - name: Skip calibration and route-safety eval
+        if: steps.detect.outputs.run_calibration_eval != 'true'
+        run: |
+          echo "No router/classifier/eval paths changed; calibration eval not required." \
+            | tee /tmp/relayops_calibration_eval.txt
 
       - name: Build PR review report
         if: always()
@@ -170,6 +190,8 @@ jobs:
             echo "- Deterministic agent eval outcome: ${{ steps.agent_eval.outcome || 'skipped' }}"
             echo "- Intent classifier eval required: ${{ steps.detect.outputs.run_intent_eval }}"
             echo "- Intent classifier eval outcome: ${{ steps.intent_eval.outcome || 'skipped' }}"
+            echo "- Calibration/safety eval required: ${{ steps.detect.outputs.run_calibration_eval }}"
+            echo "- Calibration/safety eval outcome: ${{ steps.calibration_eval.outcome || 'skipped' }}"
             echo
             echo "### Changed files"
             sed 's/^/- `/' /tmp/relayops_changed_files.txt | sed 's/$/`/'
@@ -236,6 +258,11 @@ jobs:
 
           if [[ "${{ steps.detect.outputs.run_intent_eval }}" == "true" && "${{ steps.intent_eval.outcome }}" != "success" ]]; then
             echo "Required intent classifier eval failed."
+            failed="true"
+          fi
+
+          if [[ "${{ steps.detect.outputs.run_calibration_eval }}" == "true" && "${{ steps.calibration_eval.outcome }}" != "success" ]]; then
+            echo "Required calibration/safety eval failed."
             failed="true"
           fi
 

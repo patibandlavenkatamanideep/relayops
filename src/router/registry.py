@@ -6,6 +6,7 @@ accepts whatever this returns.
 
   keyword   -> rule baseline (no training, always available)
   nb        -> Complement Naive Bayes, fit on the labeled dataset (offline)
+  nb_calibrated -> NB with validation-set confidence calibration for routing
   prompted  -> Claude Haiku few-shot       (needs ANTHROPIC_API_KEY)
   finetuned -> fine-tuned small LM          (needs transformers + a model)
 """
@@ -26,6 +27,12 @@ def get_classifier(name: str = "keyword") -> IntentClassifier:
 
         pairs = [(e.text, e.intent) for e in load_dataset()]
         return TrainedClassifier().fit(pairs)
+
+    if name in ("nb_calibrated", "calibrated", "trained_calibrated"):
+        from ..eval.dataset import load_dataset
+        from .calibration import fit_calibrated_nb
+
+        return fit_calibrated_nb(load_dataset())
 
     if name == "prompted":
         from ..eval.dataset import load_dataset

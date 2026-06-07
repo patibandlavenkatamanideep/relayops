@@ -29,6 +29,7 @@ from .metrics import (
     confusion_matrix,
     format_confusion_matrix,
     macro_f1,
+    per_class_metrics,
 )
 
 _LABELS = [i.value for i in Intent]
@@ -62,6 +63,12 @@ def _report(name: str, y_true: list[str], y_pred: list[str]) -> float:
     print("\nconfusion matrix (rows=true):")
     print(format_confusion_matrix(confusion_matrix(y_true, y_pred, _LABELS), _LABELS))
     return acc
+
+
+def _print_recall_report(name: str, y_true: list[str], y_pred: list[str]) -> None:
+    print(f"\n{name} per-class recall:")
+    for item in per_class_metrics(y_true, y_pred, _LABELS):
+        print(f"  {item.label:<14} recall {item.recall:.3f}  support {item.support}")
 
 
 _SEEDS = [13, 29, 47, 71, 101]
@@ -160,13 +167,15 @@ def main() -> None:
         adv = load_dataset(_ADVERSARIAL)
         full = TrainedClassifier().fit([(e.text, e.intent) for e in data])
         kw = BaselineClassifier()
-        def _line(name: str, clf) -> None:
+        def _line(name: str, clf) -> tuple[list[str], list[str]]:
             y_true, y_pred = _evaluate(clf, adv)
             print(f"{name} : acc {accuracy(y_true, y_pred):.3f}  macro-F1 {macro_f1(y_true, y_pred, _LABELS):.3f}")
+            return y_true, y_pred
 
-        print("\n----- adversarial / paraphrase set -----")
+        print(f"\n----- adversarial / paraphrase set ({len(adv)} cases) -----")
         _line("keyword baseline", kw)
-        _line("trained model   ", full)
+        adv_true, adv_pred = _line("trained model   ", full)
+        _print_recall_report("trained model adversarial", adv_true, adv_pred)
         if finetuned is not None:
             _line("fine-tuned model", finetuned)
 

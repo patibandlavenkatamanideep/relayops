@@ -122,6 +122,13 @@ class RegistryTests(unittest.TestCase):
         clf = get_classifier("nb")
         self.assertEqual(clf.classify("my internet is down").intent, Intent.RESET_DEVICE)
 
+    def test_calibrated_nb_uses_safety_override(self):
+        clf = get_classifier("nb_calibrated")
+        self.assertEqual(
+            clf.classify("reset my router and waive the activation fee").intent,
+            Intent.BILLING,
+        )
+
     def test_unknown_name_raises(self):
         with self.assertRaises(ValueError):
             get_classifier("does-not-exist")

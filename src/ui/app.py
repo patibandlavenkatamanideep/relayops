@@ -117,10 +117,10 @@ def main() -> None:
         )
         st.selectbox(
             "Classifier",
-            ["keyword", "nb"],
+            ["keyword", "nb", "nb_calibrated"],
             index=0,
             key="classifier_name",
-            help="Use nb for the strong offline learned baseline.",
+            help="Use nb_calibrated to show v1.2 confidence calibration.",
         )
         st.text_input(
             "Explicit device id",

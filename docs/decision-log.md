@@ -4,6 +4,17 @@ Append-only record of decisions. Newest at top. Each entry: ID, date, decision, 
 
 ## Portfolio-scope deltas (P-series)
 
+### P6 — Calibrate NB routing and add route-safety metrics
+**Date:** June 2026
+v1.2 maps Complement NB's flat raw confidence to empirical validation precision,
+adds narrow deterministic safety overrides for money/customer-data/status cues,
+and expands the hand-written adversarial set from 24 to 100 cases. The eval now
+reports safe-route rate, route-correct rate, over-escalation, unsafe auto-action,
+billing escape, and scope-violation block rate.
+**Why:** Classifier accuracy alone is not the production metric. A wrong
+classification can still be safe if it escalates; the key failure is unsafe
+auto-action or money-touching escape.
+
 ### P1 — Scope v1 to a single-intent, chat-only vertical slice
 **Date:** June 2026
 Build "reset my device" end to end; document the rest as designed-not-built.
@@ -28,8 +39,10 @@ The Tier-1 classifier is a fine-tuned small open model, not Claude. Offline, a
 Complement-NB model stands in (beats keyword 0.492→0.932 CV on the 2,400-example
 group-aware paraphrase dataset). The Qwen2.5-1.5B LoRA fine-tune is now trained +
 evaluated (Colab/Unsloth): held-out 0.999 acc, and on the hand-written adversarial
-set 0.958 acc / 0.804 macro-F1 vs NB's 0.667 / 0.562 — the real generalization win,
-since the synthetic held-out set is easy for any decent learner. Recipe +
+legacy 24-case set 0.958 acc / 0.804 macro-F1 vs NB's 0.667 / 0.562 — the real
+generalization win, since the synthetic held-out set is easy for any decent
+learner. The v1.2 100-case adversarial rerun is pending before upgrading the
+Qwen adversarial claim. Recipe +
 chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship for GPU
 runs; public adapter upload pending. Classifiers are switchable via
 `router.registry.get_classifier`.

@@ -60,6 +60,7 @@ The reviewer must not:
 | `src/router/**` or `src/graph/**` | Deterministic agent eval output from `python3 -m src.eval.run_agent_eval`. |
 | `src/eval/**` or `tests/**` | Updated deterministic expectations and proof that the eval suite still passes. |
 | Classifier dataset/model changes | Output from `python3 -m src.eval.run_intent_eval`. |
+| Calibration, threshold, or route-safety changes | Output from `python3 -m src.eval.eval_calibration`. |
 | README/model metric changes | The exact command and output that support the claim. |
 | Hugging Face/model artifact claims | Link to artifact plus eval status: complete, pending, or intentionally skipped. |
 
@@ -83,6 +84,12 @@ Intent classifier eval:
 python3 -m src.eval.run_intent_eval
 ```
 
+Calibration and route-safety eval:
+
+```bash
+python3 -m src.eval.eval_calibration
+```
+
 Optional LLM-as-judge eval:
 
 ```bash
@@ -99,6 +106,8 @@ The AI reviewer should ask:
 - Can any tool act on a device/account outside the authenticated customer?
 - Did guardrail changes weaken invented-offer, price, PII, or tone blocking?
 - Did router threshold changes increase action-taking without new eval proof?
+- Did calibration changes improve route correctness without increasing unsafe
+  auto-actions, billing escapes, or unsupported escapes?
 - Did README metrics change without a matching eval command/output?
 - Did docs overclaim Qwen LoRA, Gemini judge, cost, latency, deployment, or safety?
 - Did the PR add runtime dependencies to support reviewer automation? It should not.
