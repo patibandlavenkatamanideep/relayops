@@ -1,5 +1,6 @@
 [build]
-builder = "railpack"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [build.variables]
 RAILPACK_INSTALL_CMD = "pip install ."
