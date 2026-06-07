@@ -32,6 +32,11 @@ dev = [
     "ruff>=0.6",
     "scikit-learn>=1.5",   # confusion matrix / classifier metrics
 ]
+# Real neural dense-retrieval arm (Anthropic's recommended embeddings partner).
+# Without this the retriever falls back to the offline TF-IDF arm.
+embeddings = [
+    "voyageai>=0.3",
+]
 
 [build-system]
 requires = ["hatchling"]

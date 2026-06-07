@@ -1,45 +1,31 @@
-"""Hybrid retriever — BM25 (lexical) + TF-IDF cosine (vector) fused with RRF.
+"""Hybrid retriever — BM25 (lexical) + a pluggable dense arm, fused with RRF.
 
-This is the v1 stand-in for the design's "BM25 + dense + RRF" retriever,
-implemented in pure Python so the slice runs with no vector DB or embedding
-model. The ``HybridRetriever.search`` interface is what a Chroma-backed dense
-arm would slot into later — swap the TF-IDF arm for real embeddings and the
-fusion + citation plumbing is unchanged.
+The dense arm is now a real, swappable ``Embedder`` (Voyage AI neural embeddings
+when configured; a labeled TF-IDF fallback otherwise — see ``embeddings.py``).
 
-Grounding: a chunk only enters a ranking if it has positive evidence for the
-query (BM25 > 0 or cosine > 0). If neither arm finds anything, ``search``
-returns []. The pipeline treats an empty result as "unverifiable" and escalates,
-rather than answering from nothing.
+Grounding is driven by the dense arm's **semantic similarity threshold**
+(``embedder.min_similarity``), not by lexical ">0 on any term". A chunk is
+admitted only if its dense cosine clears that threshold; BM25 then refines the
+ranking of the admitted set. With neural embeddings this makes grounding robust
+and stopword-independent: an off-topic query scores low even if it happens to
+share a function word with a document, so ``search`` returns [] and the pipeline
+escalates as "unverifiable" instead of answering from nothing.
 """
 
 from __future__ import annotations
 
 import math
-import re
 from collections import Counter
 from dataclasses import dataclass
 
+from .embeddings import Embedder, default_embedder, tokenize
 from .store import Chunk
-
-_TOKEN = re.compile(r"\b\w+\b")
-_STOP = frozenset(
-    "a an the is are was were be been do does did to of in on for and or it its "
-    "i you my your me we our this that these those with as at by from "
-    # function / question words: shouldn't ground a retrieval on their own
-    "how why what when where which who can could should would will may might must "
-    "up down out into onto off over under about get got also just only very "
-    "if then so than there here not no yes".split()
-)
 
 # BM25 params
 _K1 = 1.5
 _B = 0.75
 # Reciprocal-rank-fusion constant
 _RRF_K = 60
-
-
-def _tokenize(text: str) -> list[str]:
-    return [t for t in _TOKEN.findall(text.lower()) if t not in _STOP]
 
 
 @dataclass
@@ -67,33 +53,25 @@ class RetrievedChunk:
 
 
 class HybridRetriever:
-    def __init__(self, chunks: list[Chunk]) -> None:
+    def __init__(self, chunks: list[Chunk], embedder: Embedder | None = None) -> None:
         self.chunks = chunks
-        self._toks = [_tokenize(c.text) for c in chunks]
+        texts = [c.text for c in chunks]
+        self.embedder = embedder or default_embedder(texts)
+
+        # --- lexical (BM25) index ---
+        self._toks = [tokenize(t) for t in texts]
         self._N = len(chunks)
         self._avgdl = (sum(len(t) for t in self._toks) / self._N) if self._N else 0.0
-
-        # document frequency over the corpus
         self._df: Counter[str] = Counter()
         for toks in self._toks:
             for term in set(toks):
                 self._df[term] += 1
-
-        # per-chunk term counts (shared by both arms)
         self._tf: list[Counter[str]] = [Counter(t) for t in self._toks]
 
-        # tf-idf doc vectors (normalised) for the cosine arm
-        self._tfidf_docs: list[dict[str, float]] = [self._tfidf_vec(tf) for tf in self._tf]
+        # --- dense index (embedder-owned vectors) ---
+        self._doc_vecs = self.embedder.embed_documents(texts) if self._N else []
 
     # --- scoring arms ---
-
-    def _idf_tfidf(self, term: str) -> float:
-        return math.log((self._N + 1) / (self._df.get(term, 0) + 1)) + 1.0
-
-    def _tfidf_vec(self, tf: Counter[str]) -> dict[str, float]:
-        vec = {t: c * self._idf_tfidf(t) for t, c in tf.items()}
-        norm = math.sqrt(sum(v * v for v in vec.values())) or 1.0
-        return {t: v / norm for t, v in vec.items()}
 
     def _bm25_scores(self, q_terms: list[str]) -> list[float]:
         scores = [0.0] * self._N
@@ -111,39 +89,33 @@ class HybridRetriever:
                 scores[i] += idf * (f * (_K1 + 1)) / denom
         return scores
 
-    def _cosine_scores(self, q_terms: list[str]) -> list[float]:
-        qv = self._tfidf_vec(Counter(q_terms))
-        return [
-            sum(w * dv.get(t, 0.0) for t, w in qv.items())
-            for dv in self._tfidf_docs
-        ]
-
     # --- fusion ---
-
-    @staticmethod
-    def _ranking(scores: list[float]) -> list[int]:
-        """Indices with positive score, best first."""
-        idx = [i for i, s in enumerate(scores) if s > 0]
-        idx.sort(key=lambda i: scores[i], reverse=True)
-        return idx
 
     def search(self, query: str, k: int = 2) -> list[RetrievedChunk]:
         if self._N == 0:
             return []
-        q_terms = _tokenize(query)
-        if not q_terms:
+
+        q_terms = tokenize(query)
+        bm25 = self._bm25_scores(q_terms) if q_terms else [0.0] * self._N
+
+        qv = self.embedder.embed_query(query)
+        cos = [self.embedder.cosine(qv, dv) for dv in self._doc_vecs]
+
+        # Semantic grounding gate: admit only chunks above the similarity floor.
+        threshold = self.embedder.min_similarity
+        admitted = [i for i in range(self._N) if cos[i] >= threshold]
+        if not admitted:
             return []
 
-        bm25_rank = self._ranking(self._bm25_scores(q_terms))
-        cos_rank = self._ranking(self._cosine_scores(q_terms))
+        # Rankings restricted to the admitted set.
+        bm_rank = sorted((i for i in admitted if bm25[i] > 0), key=lambda i: bm25[i], reverse=True)
+        cos_rank = sorted(admitted, key=lambda i: cos[i], reverse=True)
 
         fused: dict[int, float] = {}
-        for ranking in (bm25_rank, cos_rank):
+        for ranking in (bm_rank, cos_rank):
             for pos, doc_i in enumerate(ranking, start=1):
                 fused[doc_i] = fused.get(doc_i, 0.0) + 1.0 / (_RRF_K + pos)
 
-        if not fused:
-            return []
         ordered = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
         return [
             RetrievedChunk(chunk=self.chunks[i], score=score, rank=r)
