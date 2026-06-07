@@ -3,10 +3,14 @@ license: apache-2.0
 base_model: Qwen/Qwen2.5-1.5B-Instruct
 library_name: peft
 tags:
+  - qwen
+  - lora
+  - unsloth
+  - peft
   - text-classification
   - intent-classification
-  - lora
   - telecom
+  - relayops
 ---
 
 # RelayOps Intent Classifier (Qwen2.5-1.5B LoRA)
@@ -21,7 +25,10 @@ exists to handle the easy-majority of routing so the frontier model is reserved 
 hard / low-confidence / action cases.
 
 ## Model details
-- **Base:** `Qwen/Qwen2.5-1.5B-Instruct`
+- **Base (inference):** `Qwen/Qwen2.5-1.5B-Instruct` — RelayOps loads the adapter
+  over this full-precision base.
+- **Trained on:** `unsloth/qwen2.5-1.5b-instruct-unsloth-bnb-4bit` (Unsloth 4-bit
+  QLoRA); the adapter loads on either base.
 - **Method:** Unsloth + LoRA/QLoRA (adapter only)
 - **Task:** single-label intent classification, output `{"intent": "<label>"}`
 - **Labels:** `reset_device`, `device_status`, `device_faq`, `billing`, `greeting`, `unknown`
@@ -36,6 +43,13 @@ hard / low-confidence / action cases.
   deterministic access gate and router (policy stays out of model weights).
 - Confidence is read from the model's own token probabilities at inference, not
   baked into labels.
+
+## Out-of-scope use
+Do **not** use this model to make billing, payment, plan-change, access-control,
+offer, or customer-eligibility decisions. It predicts **intent only**; those
+decisions belong to RelayOps' deterministic access gate, router, and human
+escalation. It is not a general-purpose intent model — it is trained on six
+telecom intents over synthetic data.
 
 ## Evaluation
 | Split | Accuracy | Macro-F1 |
