@@ -93,8 +93,9 @@ def main() -> None:
         except Exception as e:
             detail = str(e) or repr(e)
             print(f"\n[fine-tuned classifier skipped: {type(e).__name__}: {detail}]")
-            if os.environ.get("RELAYOPS_DEBUG"):
-                print(traceback.format_exc())
+            # Always show the traceback — an empty AttributeError message is useless
+            # without the failing line.
+            traceback.print_exc()
             finetuned = None
 
     # Stable headline: 5-seed cross-validation.

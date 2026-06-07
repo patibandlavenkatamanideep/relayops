@@ -154,7 +154,7 @@ without changing pipeline logic.
 |---|---|---:|---:|---|
 | Keyword baseline | ~$0 | 0.492 | 0.506 | Brittle baseline |
 | Complement NB | ~$0 | **0.932** | **0.931** | Strong offline learned baseline |
-| Qwen2.5-1.5B LoRA | Low | eval pending | eval pending | Intended Tier-1 neural classifier |
+| Qwen2.5-1.5B LoRA | Low | eval pending | eval pending | Trained adapter; eval wrapper debugging |
 | Claude Haiku prompt | Higher | optional | optional | Tier-2/reference baseline |
 
 Macro-F1 (every intent weighted equally) is reported alongside accuracy so a model

@@ -187,6 +187,16 @@ class FineTunedIntentClassifier:
 
         self._model.eval()
 
+        # Deterministic decoding for classification. Clearing the sampling params
+        # also silences "generation flags are not valid" warnings (Qwen's config
+        # ships temperature/top_p/top_k, which are ignored when do_sample=False).
+        gc = getattr(self._model, "generation_config", None)
+        if gc is not None:
+            gc.do_sample = False
+            gc.temperature = None
+            gc.top_p = None
+            gc.top_k = None
+
     def classify(self, text: str) -> Classification:
         import math
 
@@ -194,22 +204,28 @@ class FineTunedIntentClassifier:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": text},
         ]
-        input_ids = self._tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt"
+        # return_dict=True gives input_ids + attention_mask (avoids the no-mask
+        # warning and ambiguous padding when pad_token == eos_token).
+        enc = self._tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
         )
         device = _model_input_device(self._model)
         if device is not None:
-            input_ids = input_ids.to(device)
+            enc = {k: v.to(device) for k, v in enc.items()}
+        input_len = enc["input_ids"].shape[1]
 
         gen = self._model.generate(
-            input_ids=input_ids,
+            **enc,
             max_new_tokens=self._max_new_tokens,
             do_sample=False,
             return_dict_in_generate=True,
             output_scores=True,
             pad_token_id=self._tokenizer.eos_token_id,
         )
-        new_tokens = gen.sequences[0][input_ids.shape[1]:]
+        new_tokens = gen.sequences[0][input_len:]
         raw = self._tokenizer.decode(new_tokens, skip_special_tokens=True)
 
         # Confidence = mean probability the model assigned to the tokens it emitted.
