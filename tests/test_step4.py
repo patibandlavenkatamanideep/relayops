@@ -27,6 +27,12 @@ class DatasetTests(unittest.TestCase):
             set((e.text, e.intent) for e in test)
         ))
 
+    def test_stratified_split_keeps_groups_disjoint(self):
+        train, test = stratified_split(load_dataset(), test_frac=0.3, seed=13)
+        train_groups = {(e.intent, e.group) for e in train}
+        test_groups = {(e.intent, e.group) for e in test}
+        self.assertTrue(train_groups.isdisjoint(test_groups))
+
 
 class MetricsTests(unittest.TestCase):
     def test_accuracy(self):
@@ -72,8 +78,10 @@ class TrainedClassifierTests(unittest.TestCase):
             train, test = stratified_split(data, test_frac=0.3, seed=seed)
             trained = TrainedClassifier().fit([(e.text, e.intent) for e in train])
             y_true = [e.intent.value for e in test]
-            kw_accs.append(metrics.accuracy(y_true, [keyword.classify(e.text).intent.value for e in test]))
-            tr_accs.append(metrics.accuracy(y_true, [trained.classify(e.text).intent.value for e in test]))
+            keyword_preds = [keyword.classify(e.text).intent.value for e in test]
+            trained_preds = [trained.classify(e.text).intent.value for e in test]
+            kw_accs.append(metrics.accuracy(y_true, keyword_preds))
+            tr_accs.append(metrics.accuracy(y_true, trained_preds))
         mean_kw = sum(kw_accs) / len(kw_accs)
         mean_tr = sum(tr_accs) / len(tr_accs)
         # trained should beat the keyword baseline by a clear margin

@@ -60,6 +60,12 @@ class SplitTests(unittest.TestCase):
         self.assertTrue(s_train.isdisjoint(s_val))
         self.assertTrue(s_train.isdisjoint(s_test))
         self.assertTrue(s_val.isdisjoint(s_test))
+        g_train = {(e.intent, e.group) for e in train}
+        g_val = {(e.intent, e.group) for e in val}
+        g_test = {(e.intent, e.group) for e in test}
+        self.assertTrue(g_train.isdisjoint(g_val))
+        self.assertTrue(g_train.isdisjoint(g_test))
+        self.assertTrue(g_val.isdisjoint(g_test))
 
 
 class ExportTests(unittest.TestCase):

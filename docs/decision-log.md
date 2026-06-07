@@ -25,7 +25,8 @@ The cheap classifier is load-bearing in the cost story (skips frontier on the ea
 ### P5 — Fine-tune target = small open-source LM (Qwen2.5-1.5B) via Unsloth/LoRA
 **Date:** June 2026
 The Tier-1 classifier is a fine-tuned small open model, not Claude. Offline, a
-Complement-NB model stands in (beats keyword 0.60→0.70 CV); the real fine-tune
+Complement-NB model stands in (beats keyword 0.492→0.932 CV on the 2,400-example
+group-aware paraphrase dataset); the real fine-tune
 recipe + chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship
 for GPU runs. Classifiers are switchable via `router.registry.get_classifier`.
 **Why:** Anthropic has no customer fine-tuning of Claude — the honest, stronger

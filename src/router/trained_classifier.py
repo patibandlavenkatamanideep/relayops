@@ -1,7 +1,7 @@
 """Trained intent classifier — a learned model that beats the keyword baseline.
 
-This is a **Complement Naive Bayes** (Rennie et al., 2003) over bag-of-words, fit
-on the labeled dataset (``fit``). CNB is a well-known, strong text classifier for
+This is a **Complement Naive Bayes** (Rennie et al., 2003) over word + phrase
+features, fit on the labeled dataset (``fit``). CNB is a well-known, strong text classifier for
 small / class-imbalanced data — it weights each class against the *complement* of
 its examples and normalises the weights, which fixes the bias plain Multinomial
 NB shows on short, skewed corpora. It is a *real* trained model: it learns word
@@ -31,7 +31,10 @@ _TOKEN = re.compile(r"\b\w+\b")
 
 
 def _tokenize(text: str) -> list[str]:
-    return _TOKEN.findall(text.lower())
+    words = _TOKEN.findall(text.lower())
+    bigrams = [f"{a}_{b}" for a, b in zip(words, words[1:])]
+    trigrams = [f"{a}_{b}_{c}" for a, b, c in zip(words, words[1:], words[2:])]
+    return words + bigrams + trigrams
 
 
 class TrainedClassifier:

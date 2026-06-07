@@ -39,13 +39,14 @@ behind one `IntentClassifier` interface (`router.registry.get_classifier`):
 
 | Classifier | Cost | Held-out (5-seed CV) | Notes |
 |---|---|---|---|
-| keyword baseline | ~0 | 0.60 | brittle on paraphrases/slang |
-| Complement NB (offline learned) | ~0 | **0.70** | beats keyword by +10 pts |
+| keyword baseline | ~0 | 0.492 | brittle on paraphrases/slang |
+| Complement NB (offline learned) | ~0 | **0.932** | beats keyword by +44.0 pts |
 | fine-tuned Qwen2.5-1.5B (Unsloth/LoRA) | low | target | best paraphrase/adversarial handling |
 | prompted frontier (Claude Haiku) | high | — | strong zero-shot Tier-2 reference |
 
-Reported with a confusion matrix and an **adversarial/paraphrase** set (keyword 0.25
-→ NB 0.33 — both weak, which is the gap the fine-tune closes). The fine-tune is a
+Reported on a 2,400-example paraphrase-rich intent set (400 examples per class)
+with group-aware splits, a confusion matrix, and an **adversarial/paraphrase** set
+(keyword 0.25 → NB 0.667). The fine-tune is a
 **small open-source model**, not Claude; see [docs/finetuning.md](docs/finetuning.md).
 The model emits intent only (routing/risk stay in the deterministic gate+router),
 and confidence comes from token probabilities — not fabricated labels.

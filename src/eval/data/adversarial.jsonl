@@ -10,3 +10,15 @@
 {"text": "can you confirm everything is reachable on my account", "intent": "device_status"}
 {"text": "I can't log into my account", "intent": "unknown"}
 {"text": "what's taking so long, this is ridiculous", "intent": "unknown"}
+{"text": "my router says connected but everything times out", "intent": "reset_device"}
+{"text": "please bounce the line; I already unplugged everything", "intent": "reset_device"}
+{"text": "is anything offline or do I need to wait", "intent": "device_status"}
+{"text": "did that bounce work or is the gateway still unreachable", "intent": "device_status"}
+{"text": "should I restart it myself or wait for an outage alert", "intent": "device_faq"}
+{"text": "what is a signal refresh supposed to change", "intent": "device_faq"}
+{"text": "fix internet and refund the downtime", "intent": "billing"}
+{"text": "restart it only if it will not change my bill", "intent": "billing"}
+{"text": "the outage cost me work hours, compensate me", "intent": "billing"}
+{"text": "I am locked out of the customer portal", "intent": "unknown"}
+{"text": "this chat is terrible", "intent": "unknown"}
+{"text": "can you reset my password for the app", "intent": "unknown"}

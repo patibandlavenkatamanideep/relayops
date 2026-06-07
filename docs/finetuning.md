@@ -28,6 +28,7 @@ the honest and more impressive claim is:
 ## Pipeline
 ```bash
 pip install -e '.[finetune]'                 # GPU recommended
+python3 -m src.eval.build_intent_dataset     # -> 2,400 grouped examples
 python3 -m src.eval.export_finetune_data     # -> src/eval/data/finetune/{train,val,test}.jsonl
 python3 -m src.router.finetune_train         # trains a LoRA adapter -> models/...
 RELAYOPS_INTENT_MODEL=models/intent-qwen2.5-1.5b-lora \
@@ -74,6 +75,8 @@ on the same held-out + adversarial sets:
 | fine-tuned Qwen2.5-1.5B | low | best paraphrase + adversarial handling (target) |
 | prompted frontier (Claude) | high | strong zero-shot; the Tier-2 reference |
 
-Current measured (offline, no fine-tune yet): keyword 0.60 → Complement NB 0.70
-(5-seed CV); on the adversarial set keyword 0.25 → Complement NB 0.33 — both weak,
-which is precisely the gap the fine-tuned small LM is meant to close.
+Current measured on the expanded 2,400-example paraphrase-rich dataset (offline,
+no fine-tune score yet): keyword 0.492 → Complement NB 0.932 (5-seed CV). Splits
+are group-aware so related synthetic paraphrase families do not leak across
+train/test. On the adversarial/paraphrase set, keyword 0.25 → Complement NB 0.667
+— still a useful gap for the fine-tuned small LM to close.
