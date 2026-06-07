@@ -142,6 +142,7 @@ class GeminiJudge:
 
     def __init__(self) -> None:
         from google import genai  # pip install google-genai
+        from google.genai import types
 
         self._genai = genai
         # gemini-2.5-flash has free-tier quota on typical keys; we disable its
@@ -152,7 +153,11 @@ class GeminiJudge:
         self._min_interval = float(os.environ.get("RELAYOPS_JUDGE_DELAY", "13"))
         self._last = 0.0
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        self._client = genai.Client(api_key=api_key)
+        timeout_ms = int(os.environ.get("RELAYOPS_JUDGE_TIMEOUT_MS", "30000"))
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=timeout_ms),
+        )
 
     def _throttle(self) -> None:
         wait = self._min_interval - (time.monotonic() - self._last)

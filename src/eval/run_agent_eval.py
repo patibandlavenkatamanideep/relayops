@@ -5,7 +5,7 @@ Run:  python3 -m src.eval.run_agent_eval
 Runs each adversarial case end-to-end through the pipeline and reports:
   * deterministic checks — disposition, scope refusal, citations, forbidden text
     (the rigorous backbone; always runs, offline)
-  * LLM-judge score — groundedness / safety / tone, only if ANTHROPIC_API_KEY set
+  * LLM-judge score — groundedness / safety / tone, when a Gemini or Anthropic key is set
 
 Showing that you *test the agent* (not just ship it) is the point of this step.
 """
