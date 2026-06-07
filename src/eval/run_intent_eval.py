@@ -69,6 +69,18 @@ def main() -> None:
     acc_keyword = _report("keyword baseline", *_evaluate(keyword, test))
     acc_trained = _report("trained (Complement NB)", *_evaluate(trained, test))
 
+    # Fine-tuned small LM — only when a model is configured (set in Colab).
+    finetuned = None
+    if os.environ.get("RELAYOPS_INTENT_MODEL"):
+        try:
+            from ..router.finetuned_classifier import FineTunedIntentClassifier
+
+            finetuned = FineTunedIntentClassifier()
+            _report("fine-tuned (small LM)", *_evaluate(finetuned, test))
+        except Exception as e:
+            print(f"\n[fine-tuned classifier skipped: {type(e).__name__}: {e}]")
+            finetuned = None
+
     # Stable headline: 5-seed cross-validation.
     cv_keyword = _cv_accuracy(data, lambda _: BaselineClassifier())
     cv_trained = _cv_accuracy(data, lambda pairs: TrainedClassifier().fit(pairs))
@@ -104,6 +116,8 @@ def main() -> None:
         print("\n----- adversarial / paraphrase set -----")
         print(f"keyword baseline accuracy : {accuracy(*_evaluate(kw, adv)):.3f}")
         print(f"trained model    accuracy : {accuracy(*_evaluate(full, adv)):.3f}")
+        if finetuned is not None:
+            print(f"fine-tuned model accuracy : {accuracy(*_evaluate(finetuned, adv)):.3f}")
 
 
 if __name__ == "__main__":

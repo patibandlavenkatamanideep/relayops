@@ -87,11 +87,16 @@ class FineTunedIntentClassifier:
         import torch  # noqa: F401  (validates the runtime is present)
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        # path may be a local directory OR a Hugging Face Hub repo id — both are
+        # accepted by from_pretrained.
         path = model_path or os.environ.get("RELAYOPS_INTENT_MODEL")
         self._max_new_tokens = max_new_tokens
 
-        if path and os.path.isdir(path):
-            self._tokenizer = AutoTokenizer.from_pretrained(path)
+        if path:
+            try:
+                self._tokenizer = AutoTokenizer.from_pretrained(path)
+            except Exception:
+                self._tokenizer = AutoTokenizer.from_pretrained(base_model)
             try:
                 # Try as a LoRA adapter over the base model first.
                 from peft import PeftModel
@@ -99,7 +104,7 @@ class FineTunedIntentClassifier:
                 base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
                 self._model = PeftModel.from_pretrained(base, path)
             except Exception:
-                # Otherwise treat the path as a full/merged model.
+                # Otherwise treat the path/id as a full/merged model.
                 self._model = AutoModelForCausalLM.from_pretrained(path, device_map="auto")
         else:
             # No fine-tune available -> base model (still functional, weaker).

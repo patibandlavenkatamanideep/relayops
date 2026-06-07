@@ -27,10 +27,13 @@ MAX_SEQ_LEN = 512
 
 
 def main() -> None:
-    from datasets import load_dataset
-    from trl import SFTConfig, SFTTrainer
+    # Import Unsloth FIRST — it patches transformers/trl for speed + correctness;
+    # importing it after them triggers a warning and misses optimizations.
     from unsloth import FastLanguageModel
     from unsloth.chat_templates import get_chat_template
+
+    from datasets import load_dataset
+    from trl import SFTConfig, SFTTrainer
 
     # 1. Load the base model in 4-bit and attach LoRA adapters (QLoRA).
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -72,12 +75,14 @@ def main() -> None:
     # 3. Supervised fine-tune (short — this is a small classification task).
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        # current TRL renamed tokenizer -> processing_class
+        processing_class=tokenizer,
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
         args=SFTConfig(
             dataset_text_field="text",
-            max_seq_length=MAX_SEQ_LEN,
+            # current TRL renamed SFTConfig.max_seq_length -> max_length
+            max_length=MAX_SEQ_LEN,
             per_device_train_batch_size=8,
             gradient_accumulation_steps=2,
             num_train_epochs=3,
