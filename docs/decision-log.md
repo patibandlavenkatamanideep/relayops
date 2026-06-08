@@ -4,6 +4,19 @@ Append-only record of decisions. Newest at top. Each entry: ID, date, decision, 
 
 ## Portfolio-scope deltas (P-series)
 
+### P7 — Rename "AI PR Review Agent" to "PR Safety Evidence Gate"
+**Date:** June 2026
+The v1.1 PR workflow is fully deterministic — it clears `GEMINI_API_KEY` /
+`ANTHROPIC_API_KEY` and makes no LLM call — so the "AI" label was an overclaim.
+Renamed the workflow, README, and policy doc to **PR Safety Evidence Gate** and
+fixed the advisory/enforced wording: deterministic tests/evals are enforced (the
+workflow fails when required checks fail); the posted checklist comment is
+advisory and does not approve, merge, or decide policy.
+**Why:** RelayOps's strongest quality is that it does not overclaim. A real
+LLM-assisted diff reviewer may be added later as an optional layer (e.g. only when
+`GEMINI_API_KEY` is present), but deterministic tests/evals remain the source of
+truth.
+
 ### P6 — Calibrate NB routing and add route-safety metrics
 **Date:** June 2026
 v1.2 maps Complement NB's flat raw confidence to empirical validation precision,

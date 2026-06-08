@@ -1,4 +1,4 @@
-name: AI PR Review Agent
+name: PR Safety Evidence Gate
 
 on:
   pull_request:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   relayops-policy-review:
-    name: RelayOps PR safety review
+    name: PR Safety Evidence Gate
     runs-on: ubuntu-latest
     env:
       REVIEW_MARKER: "<!-- relayops-ai-pr-review -->"
@@ -161,11 +161,14 @@ jobs:
 
           {
             echo "$REVIEW_MARKER"
-            echo "## RelayOps AI PR Review Agent (v1.1 advisory)"
+            echo "## RelayOps PR Safety Evidence Gate (v1.1)"
             echo
-            echo "This reviewer is CI-only. It is not part of the customer-support runtime,"
-            echo "does not decide customer policy, and does not change code. Deterministic"
-            echo "tests and evals remain the source of truth."
+            echo "CI-only. This gate detects risky changes, runs deterministic"
+            echo "tests/evals, and posts this evidence checklist. Deterministic checks"
+            echo "are enforced (the workflow fails when required tests/evals fail);"
+            echo "this checklist comment is advisory and does not approve, merge, or"
+            echo "decide policy. It is not part of the customer-support runtime and"
+            echo "does not change code."
             echo
             echo "Policy: docs/ai-pr-review-policy.md"
             echo
