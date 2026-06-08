@@ -1,25 +1,29 @@
-# RelayOps AI PR Review Policy
+# RelayOps PR Safety Evidence Gate Policy
 
-Status: **v1.1 CI-only advisory reviewer**
+Status: **v1.1 CI-only evidence gate**
 
-RelayOps v1.1 adds an AI-assisted pull-request safety reviewer for repository
-changes. It is a GitHub/CI workflow only. It is not part of the customer-support
-runtime, does not decide customer policy, and does not mutate code.
+RelayOps v1.1 adds a PR Safety Evidence Gate for repository changes. It is a
+GitHub/CI workflow only: it detects risky changes, runs deterministic
+tests/evals, and posts an advisory evidence checklist. It is not part of the
+customer-support runtime, does not decide customer policy, and does not mutate
+code. The v1.1 gate is fully deterministic and makes no LLM call — the name is
+kept honest rather than labeling it "AI".
 
 The design principle is the same as the rest of RelayOps:
 
-> Deterministic tests and evals are the source of truth. The AI reviewer is
-> advisory and helps humans notice risk, missing evidence, and overclaimed model
-> metrics.
+> Deterministic tests and evals are the source of truth and are enforced (the
+> workflow fails when required checks fail). The posted checklist is advisory and
+> helps humans notice risk, missing evidence, and overclaimed model metrics.
 
 Related reference project: [ayush488-glitch/ai-pr-review-agent](https://github.com/ayush488-glitch/ai-pr-review-agent).
-That project is a full webhook service with specialist review agents. RelayOps
-keeps v1.1 narrower: a repo-local policy workflow that can later be wired to a
-hosted PR review service without changing the customer-support pipeline.
+That project is a full webhook service with specialist LLM review agents. RelayOps
+keeps v1.1 narrower: a deterministic, repo-local policy gate that can later be
+wired to an optional LLM diff reviewer without changing the customer-support
+pipeline.
 
 ## Scope
 
-The reviewer focuses on changes to:
+The gate focuses on changes to:
 
 - Access gate logic.
 - Scoped MCP-style tool bodies.
@@ -31,7 +35,7 @@ The reviewer focuses on changes to:
 
 ## Non-Goals
 
-The reviewer must not:
+The gate must not:
 
 - Run inside the customer-support runtime.
 - Decide customer policy.
@@ -99,7 +103,7 @@ ANTHROPIC_API_KEY=... python3 -m src.eval.run_agent_eval
 
 ## Reviewer Checklist
 
-The AI reviewer should ask:
+A human reviewer (or a future optional LLM diff reviewer) should ask:
 
 - Did the access gate move later in the pipeline or become model-dependent?
 - Can a prompt injection widen customer scope?
@@ -115,7 +119,7 @@ The AI reviewer should ask:
 ## Roadmap Placement
 
 - v1.0: RelayOps vertical slice shipped.
-- v1.1: AI-assisted PR safety reviewer for repo changes.
+- v1.1: deterministic PR Safety Evidence Gate for repo changes.
 - v1.2: NB confidence calibration and larger adversarial set.
 - v2.0: Hermes-style RelayOps Operator Agent.
 
