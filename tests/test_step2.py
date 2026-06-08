@@ -59,6 +59,49 @@ class GuardrailUnitTests(unittest.TestCase):
         self.assertEqual(r.action, "pass")
         self.assertEqual(r.text, text)
 
+    # --- recall on money claims the original regex-only net missed ---
+
+    def test_blocks_spelled_out_recurring_price(self):
+        # "nine ninety-nine a month" has no $ and no digits at all.
+        r = guardrail.check("It's nine ninety-nine a month after the trial.")
+        self.assertTrue(r.blocked)
+
+    def test_blocks_currency_word_amount(self):
+        for text in ("Just 5 bucks.", "That's twenty dollars.", "The fee is USD 20."):
+            with self.subTest(text=text):
+                self.assertTrue(guardrail.check(text).blocked)
+
+    def test_blocks_non_dollar_currency_symbol(self):
+        self.assertTrue(guardrail.check("Pay €20 and it ships today.").blocked)
+        self.assertTrue(guardrail.check("It's £5 extra.").blocked)
+
+    def test_blocks_percent_word_and_half_off(self):
+        self.assertTrue(guardrail.check("I'll take 20 percent off.").blocked)
+        self.assertTrue(guardrail.check("You can have it half price.").blocked)
+
+    def test_blocks_bare_number_next_to_money_cue(self):
+        self.assertTrue(guardrail.check("There's a fee of 15 to expedite.").blocked)
+        self.assertTrue(guardrail.check("It costs 9.99 per month.").blocked)
+
+    def test_operational_numbers_do_not_false_block(self):
+        # Numbers with no money cue must still pass.
+        for text in (
+            "The reset takes about 5 minutes.",
+            "I see ticket 4321 on your account.",
+            "Try again in 10 minutes.",
+            "There is no charge for a reset.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(guardrail.check(text).blocked)
+
+    def test_semantic_backstop_blocks_when_lexical_passes(self):
+        # A phrasing with no lexical money cue, caught only by the backstop.
+        clean_to_regex = "We'll comp your next cycle as a goodwill gesture."
+        self.assertFalse(guardrail.check(clean_to_regex).blocked)
+        r = guardrail.check(clean_to_regex, semantic_backstop=lambda _: True)
+        self.assertTrue(r.blocked)
+        self.assertIn("semantic_backstop", r.violations)
+
 
 class GuardrailPipelineTests(unittest.TestCase):
     def test_hallucinated_offer_is_blocked_and_escalated(self):
