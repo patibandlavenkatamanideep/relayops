@@ -13,13 +13,18 @@ unsafe, ungrounded, or low-confidence turns are handed to a human.
 
 | What | Result |
 |---|---|
-| Intent classifier (held-out acc) | keyword 0.506 → Complement NB 0.933 → **Qwen LoRA 0.999** |
+| Intent classifier (held-out acc) | keyword 0.506 → Complement NB 0.933 → Qwen LoRA 0.999 ‡ |
 | 100-case adversarial classifier acc | keyword 0.490 → NB 0.660 → **safe calibrated NB 0.880** |
 | v1.2 route safety | **safe-route 1.000**, unsafe auto-action 0.000, billing escape 0.000 — in-distribution (authored cue set); held-out slice holds too (route-correct 0.846). See [honest framing](#honest-framing-of-the-safety-result). |
 | Agent safety (deterministic adversarial checks) | **7/7 pass** |
 | Agent response quality (cross-family Gemini LLM-judge) | **6/7 pass, mean 4.6/5**; post-fix rerun pending |
 | Fine-tuned adapter | [published on Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen) |
 | Live demo | [relayops-production.up.railway.app](https://relayops-production.up.railway.app) |
+
+‡ **Don't quote 0.999 on its own.** Held-out is template-generated **synthetic,
+in-distribution** data — a ceiling any decent learner reaches even with anti-leakage
+splits, **not** a production benchmark. The trustworthy generalization signals are
+the hand-written adversarial accuracy and route-safety rows above. [Why](#reading-the-numbers-honestly).
 
 Detail in [Intent Classifier](#intent-classifier) and [Agent evaluation](#agent-evaluation-adversarial--llm-as-judge)
 below — including the honest synthetic-data caveat and a real gap the judge caught.
@@ -88,6 +93,20 @@ Violations: unapproved_amount, unapproved_discount, unapproved_recurring_price
 Final: human handoff; made-up offer never reaches the customer
 ```
 
+Because the approved catalog only permits *free* / $0, the offer check optimizes
+for **recall** over a single regex: it blocks money claims across symbols
+(`$/€/£`), currency words ("20 dollars", "5 bucks"), spelled-out amounts ("nine
+ninety-nine a month"), discount phrasings ("half off", "20 percent off"), and bare
+numbers next to a money cue ("a fee of 15"), while clean operational numbers
+("reset takes 5 minutes") pass. The lexical guardrail is intentionally
+**recall-heavy** for money/offer claims: false positives merely escalate to a
+human, while false negatives could expose users to invented pricing — so the
+tradeoff is tuned toward over-blocking. Lexical patterns are still pattern-matching and
+can be out-phrased, so `guardrail.check()` also takes an optional
+`semantic_backstop` (e.g. an LLM judge) consulted when the cheap checks pass —
+layered, not regex-only. Coverage is locked by regression tests in
+[tests/test_step2.py](tests/test_step2.py).
+
 ## Built vs Designed
 
 | Component | Status |
@@ -108,7 +127,7 @@ Final: human handoff; made-up offer never reaches the customer
 | Per-turn latency tracking | Built |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
-| AI-assisted PR safety reviewer | Built as CI-only v1.1 workflow |
+| PR Safety Evidence Gate | Built as CI-only v1.1 workflow |
 | MCP transport wrapper | Designed; tool bodies already scoped |
 | Token/cost dashboards | Designed only |
 | Voice, event bus, canary rollout | Designed only |
@@ -198,15 +217,19 @@ cp .env.example .env   # then fill in GEMINI_API_KEY, and run the eval normally
 python3 -m src.eval.run_agent_eval
 ```
 
-Review risky PRs with the CI-only AI PR Review Agent policy:
+Review risky PRs with the CI-only PR Safety Evidence Gate:
 
 ```bash
 # Runs automatically on pull requests through .github/workflows/ai-pr-review.yml
 # Policy: docs/ai-pr-review-policy.md
 ```
 
-The PR reviewer is advisory. It never runs in the customer-support runtime and
-never overrides deterministic tests or evals.
+v1.1 adds a CI-only PR Safety Evidence Gate. It detects risky changes to access
+control, scoped tools, routing, guardrails, evals, classifier metrics, and README
+claims, runs deterministic checks/evals, and posts an advisory evidence checklist.
+The workflow fails when required tests/evals fail or required evidence is missing,
+but it does not merge code, decide policy, or participate in the customer-support
+runtime.
 
 ## v1.2 Calibration + Safety Routing
 
@@ -319,7 +342,7 @@ without changing pipeline logic.
 | Keyword baseline | ~$0 | 0.506 | 0.516 | 0.490 | 0.490 |
 | Complement NB | ~$0 | 0.933 | 0.932 | 0.660 | 0.653 |
 | Safe calibrated NB (v1.2) | ~$0 | 0.934* | 0.932* | **0.880** | **0.872** |
-| Qwen2.5-1.5B LoRA | low | **0.999** | **0.999** | 0.958† | 0.804† |
+| Qwen2.5-1.5B LoRA | low | 0.999‡ | 0.999‡ | 0.958† | 0.804† |
 | Claude Haiku prompt | high | optional | optional | — | — |
 
 Held-out = seed-13 **group-aware** stratified test (726 ex, paraphrase families
@@ -327,7 +350,10 @@ kept whole so they can't straddle train/test) for keyword/NB/Qwen. `*` Safe
 calibrated NB uses a train/calibration/test split (363 held-out examples) because
 it needs a held-out calibration fold. Adversarial = 100 hand-written hard cases
 (slang, mixed-intent, prompt injection, cross-customer, vague turns, fake
-offers/prices, and unsupported requests). `†` Qwen adversarial was measured on
+offers/prices, and unsupported requests). `‡` Held-out is **synthetic and
+in-distribution** — a ceiling, not a production benchmark; it is left un-bolded on
+purpose so the misquotable number isn't the trophy (the adversarial column is the
+real signal). `†` Qwen adversarial was measured on
 the earlier 24-case set; the 100-case rerun is pending. Macro-F1 weights every
 intent equally so a model can't win by leaning on easy classes. Keyword and NB
 also hold under 5-seed cross-validation (0.492 / 0.932 acc); prompted Claude
@@ -346,6 +372,11 @@ I treat the held-out result as **routing-slice validation** — evidence that a 
 local classifier can replace frontier calls for the easy-majority of routing — not
 a production benchmark. Group-aware splits + a separate hand-written adversarial set
 are how I keep that claim honest.
+
+The non-obvious choices here (Complement NB vs Multinomial, calibrating confidence
+vs lowering the threshold, what the per-customer scope check does and doesn't
+protect) are defended with mechanism + code references in
+[docs/tradeoff-defense.md](docs/tradeoff-defense.md).
 
 ### Why the fine-tune earns its place
 
