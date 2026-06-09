@@ -1,8 +1,16 @@
 # RelayOps
 
-**Production-shaped AI customer-service agent for telecom/subscription support.**
+**Production-shaped AI support-agent prototype for telecom/subscription support.**
 
-Status: **v1 vertical slice working; Qwen LoRA fine-tune trained, evaluated, and [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).**
+Status: **working prototype — v1 vertical slice; Qwen LoRA fine-tune trained,
+evaluated, and [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).**
+
+> **Honest scope.** This is a prototype evaluated on **synthetic / hand-authored**
+> data and a **sample ticket queue** — there are **no production users** and no
+> real-traffic numbers. "Production-shaped" means the architecture mirrors
+> production patterns (access gate, scoped tools, guardrails, audit trail), not
+> that it has been run in production. I'm posting it for critique and to find
+> design partners with a small redacted ticket queue to validate against.
 
 RelayOps handles customer chat turns through a deterministic access gate, a tiered
 intent router, scoped tools, hybrid RAG, and an independent guardrail. The built
@@ -396,14 +404,13 @@ python3 -m src.eval.handoff_eval     # handoff completeness + support outcome + 
 
 ## v1.4 Persistent Audit Store + Decision Console
 
-v1.3 produced audit records in memory. v1.4 makes them **durable and
-operational**: every turn is written to SQLite, surfaced in a live Decision
-Console, and exportable as evidence — and escalations become actionable tickets
-in a human handoff queue.
+v1.3 produced audit records in memory. v1.4 makes them **durable**: every turn is
+written to SQLite, surfaced in a Decision Console, and exportable as evidence —
+and escalations become actionable tickets in a human handoff queue.
 
-This is the positioning shift: RelayOps is a **real-time telecom support agent
-that makes audited routing decisions, blocks unsafe actions, and creates usable
-human handoffs** — not just a pipeline.
+The framing this supports: RelayOps is a **support-agent prototype that makes
+auditable routing decisions, blocks unsafe actions, and creates usable human
+handoffs** — not just a pipeline. (Prototype on sample data; no production users.)
 
 v1.4 adds:
 
