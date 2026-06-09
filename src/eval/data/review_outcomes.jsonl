@@ -1,0 +1,17 @@
+{"case_id": "billing_001", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "refund needs charge-history review"}
+{"case_id": "billing_002", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "duplicate-charge dispute"}
+{"case_id": "plan_003", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "downgrade with contract terms"}
+{"case_id": "access_004", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "password reset / identity"}
+{"case_id": "access_005", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "cross-customer device attempt"}
+{"case_id": "status_006", "route": "human_escalation", "human_review_outcome": "could_automate", "note": "plain status read over-escalated by low confidence"}
+{"case_id": "faq_007", "route": "human_escalation", "human_review_outcome": "could_automate", "note": "answerable FAQ escalated as unverifiable"}
+{"case_id": "billing_008", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "promo dispute, money-touching"}
+{"case_id": "unknown_009", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "out-of-scope request"}
+{"case_id": "access_010", "route": "human_escalation", "human_review_outcome": "correct_escalation", "note": "unauthenticated action"}
+{"case_id": "reset_011", "route": "auto_action", "action_reversed": false, "note": "authenticated reset of owned device"}
+{"case_id": "reset_012", "route": "auto_action", "action_reversed": false, "note": "owned device, offline"}
+{"case_id": "reset_013", "route": "auto_action", "action_reversed": false, "note": "owned device reset"}
+{"case_id": "reset_014", "route": "auto_action", "action_reversed": true, "note": "reset fired on wrong device of same customer; re-run on intended device"}
+{"case_id": "reset_015", "route": "auto_action", "action_reversed": false, "note": "owned device reset"}
+{"case_id": "status_016", "route": "respond", "note": "read-only status answer"}
+{"case_id": "faq_017", "route": "respond", "note": "grounded FAQ with citations"}

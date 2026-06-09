@@ -31,9 +31,10 @@ from ..core.models import (
 )
 from ..guardrails import guardrail
 from ..mcp import tools
+from ..observability.audit_ledger import AuditLedger
 from ..rag.retriever import HybridRetriever
 from ..rag.store import load_chunks
-from ..router import router
+from ..router import action_policy, router
 from ..router.classifier import BaselineClassifier, IntentClassifier
 
 # Number of cited chunks to retrieve for an FAQ answer.
@@ -169,14 +170,16 @@ class TemplateComposer:
 
 def _escalate(state: TurnState, reason: str, extra: dict | None = None) -> AgentResponse:
     assert state.classification is not None and state.route is not None
-    handoff = {
-        "reason": reason,
-        "intent": state.classification.intent.value,
-        "confidence": round(state.classification.confidence, 2),
-        "message": state.text,
-    }
-    if extra:
-        handoff.update(extra)
+    # Build a COMPLETE handoff (owner, evidence, customer promise, SLA) so the
+    # next human can continue without rereading the chat — safe-but-stranded is
+    # still a failure. See action_policy.REQUIRED_HANDOFF_FIELDS.
+    handoff = action_policy.build_handoff(
+        intent=state.classification.intent,
+        reason=reason,
+        customer_message=state.text,
+        confidence=state.classification.confidence,
+        extra=extra,
+    )
     return AgentResponse(
         text=(
             "I'm connecting you with a specialist who can help with this — "
@@ -218,13 +221,29 @@ def handle_turn(
     device_id: str | None = None,
     classifier: IntentClassifier | None = None,
     composer: Composer | None = None,
+    audit: AuditLedger | None = None,
+    classifier_name: str | None = None,
 ) -> AgentResponse:
-    """Run one customer turn through the full v1 pipeline."""
+    """Run one customer turn through the full v1 pipeline.
+
+    Pass an ``AuditLedger`` to capture the per-turn decision trail (gate, scope,
+    route, tool, guardrail, handoff reason, evidence) — see
+    ``observability/audit_ledger.py``.
+    """
     classifier = classifier or BaselineClassifier()
     composer = composer or TemplateComposer()
+    name = classifier_name or type(classifier).__name__
     state = TurnState(raw_text=raw_text, auth_token=auth_token, device_id=device_id)
 
     start = time.perf_counter()
+
+    def finalize(response: AgentResponse) -> AgentResponse:
+        response.latency_ms = (time.perf_counter() - start) * 1000
+        state.response = response
+        if audit is not None:
+            audit.record(state, response, name)
+        return response
+
     state = ingest(state)
     state = access_gate(state)
     state = classify(state, classifier)
@@ -232,40 +251,33 @@ def handle_turn(
 
     # Unauthenticated callers never reach a model or tool.
     if state.access is not None and not state.access.authenticated:
-        response = _escalate(state, reason="unauthenticated")
-    elif state.route and state.route.disposition == Disposition.ESCALATE:
-        response = _escalate(state, reason=state.route.reason)
-    else:
-        state = run_tool(state)
-        if state.tool_results and not state.tool_results[-1].ok:
-            error = state.tool_results[-1].error or "tool_failed"
-            response = _escalate(state, reason=f"tool_error:{error}")
-            response.latency_ms = (time.perf_counter() - start) * 1000
-            state.response = response
-            return response
-        if state.route and state.route.retrieve:
-            state = retrieve(state)
-            # No grounding found -> don't answer from nothing; escalate.
-            if not state.retrieved:
-                response = _escalate(state, reason="unverifiable")
-                response.latency_ms = (time.perf_counter() - start) * 1000
-                state.response = response
-                return response
-        candidate = composer.compose(state)
-        # INDEPENDENT GUARDRAIL: vet the candidate before it ships.
-        guard = guardrail.check(candidate)
-        if guard.blocked:
-            # A hallucinated offer/price (or tone breach) is escalated to a human.
-            response = _escalate(
-                state,
-                reason="guardrail_block",
-                extra={"violations": guard.violations, "blocked_candidate": candidate},
-            )
-            response.guardrail_action = "block"
-            response.guardrail_violations = guard.violations
-        else:
-            response = _respond(state, guard.text, guard)
+        return finalize(_escalate(state, reason="unauthenticated"))
+    if state.route and state.route.disposition == Disposition.ESCALATE:
+        return finalize(_escalate(state, reason=state.route.reason))
 
-    response.latency_ms = (time.perf_counter() - start) * 1000
-    state.response = response
-    return response
+    state = run_tool(state)
+    if state.tool_results and not state.tool_results[-1].ok:
+        error = state.tool_results[-1].error or "tool_failed"
+        return finalize(_escalate(state, reason=f"tool_error:{error}"))
+
+    if state.route and state.route.retrieve:
+        state = retrieve(state)
+        # No grounding found -> don't answer from nothing; escalate.
+        if not state.retrieved:
+            return finalize(_escalate(state, reason="unverifiable"))
+
+    candidate = composer.compose(state)
+    # INDEPENDENT GUARDRAIL: vet the candidate before it ships.
+    guard = guardrail.check(candidate)
+    if guard.blocked:
+        # A hallucinated offer/price (or tone breach) is escalated to a human.
+        response = _escalate(
+            state,
+            reason="guardrail_block",
+            extra={"violations": guard.violations, "blocked_candidate": candidate},
+        )
+        response.guardrail_action = "block"
+        response.guardrail_violations = guard.violations
+        return finalize(response)
+
+    return finalize(_respond(state, guard.text, guard))

@@ -125,6 +125,10 @@ layered, not regex-only. Coverage is locked by regression tests in
 | Guardrail for offers/prices, PII, tone | Built |
 | Synchronous graph-shaped pipeline | Built |
 | Per-turn latency tracking | Built |
+| Per-turn audit ledger (decision evidence) | Built (v1.3) |
+| Action taxonomy / policy table (blast radius · reversibility) | Built (v1.3) |
+| Owner-routed handoff + completeness eval | Built (v1.3) |
+| Review-override / rollback metrics | Built (v1.3, simulated labels) |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
 | PR Safety Evidence Gate | Built as CI-only v1.1 workflow |
@@ -188,6 +192,12 @@ Evaluate NB confidence calibration and route-level safety:
 
 ```bash
 python3 -m src.eval.eval_calibration
+```
+
+Evaluate handoff completeness, support outcome, and override/rollback metrics:
+
+```bash
+python3 -m src.eval.handoff_eval
 ```
 
 Train the Qwen LoRA adapter on a GPU machine:
@@ -279,6 +289,99 @@ billing escape 0.000**, route-correct **0.846** (vs 0.918 on dev) — and the
 deterministic-only generalization signal is the *raw/calibrated-NB* row above
 (safe-route without cues). Next step: freeze the cues against the held-out slice
 (or author it independently) so that 0.846 becomes a true generalization number.
+
+## v1.3 Audit Ledger + Handoff-Quality Evals
+
+Gate *architecture* and gate *execution evidence* are different artifacts. v1.2
+proves the design — access gate → router → tool/RAG → guardrail →
+respond/handoff. v1.3 proves **what happened on each turn**, and that a safe
+block actually produced a *usable* handoff.
+
+RelayOps records per-turn decision evidence: which gate ran, what scope was
+applied, which policy fired, whether tools were called, whether guardrails
+passed/blocked, and why the system responded or escalated. And it now evaluates
+not only whether unsafe actions were blocked, but whether the block produced a
+usable support handoff with **owner, reason, evidence, and next step** — because
+"safe but stranded" is still a failed support outcome.
+
+v1.3 adds:
+
+- `src/observability/audit_ledger.py` — a per-turn `AuditLedger` that records a
+  deterministic decision trail (built from the turn's state, never re-inferred).
+  Pass `audit=AuditLedger()` to `handle_turn(...)`.
+- `src/router/action_policy.py` — an action **taxonomy + policy table** (blast
+  radius · reversibility · evidence needed · route · owner · SLA), so routing
+  reads like a policy engine, not ad-hoc `if/else`. The escalation handoff is
+  built from this table, so it always carries an owner and a next step.
+- `src/eval/handoff_eval.py` — `handoff_completeness_rate` (safe-abandonment
+  guard), `support_outcome_complete` (safe **and** usable), and simulated
+  `review_override_rate` / `post_action_rollback_rate`.
+- `src/eval/data/review_outcomes.jsonl` — labeled review/rollback outcomes
+  (simulated; the metric plumbing is real).
+- `tests/test_audit_ledger.py`, `tests/test_action_policy.py`,
+  `tests/test_handoff_eval.py` — regression tests for the above.
+
+### Action policy table
+
+| Action | Blast radius | Reversible | Evidence needed | Route |
+|---|---|---|---|---|
+| `device_reset` | low | yes | authenticated device ownership | auto-action |
+| `send_troubleshooting_link` | low | yes | relevant FAQ match | respond |
+| `account_read` (status) | low | yes | authenticated account scope | respond |
+| `billing_refund` | high | partial | human review of charge history | escalate |
+| `plan_change` | high | partial | human review of plan terms | escalate |
+| `account_access_change` | high | no | human review + identity verification | escalate |
+| `unknown` | unknown | unknown | insufficient — needs a human | escalate |
+
+Only low-blast, reversible, cheap-evidence actions are eligible to auto-run;
+everything money- or identity-touching escalates with an owner attached.
+
+### Example audit record
+
+```json
+{
+  "turn_id": "bdb9bc82a010",
+  "timestamp": "2026-06-09T04:27:53+00:00",
+  "customer_id": "cust_alice",
+  "authenticated": true,
+  "intent": "billing",
+  "classifier": "nb_calibrated",
+  "confidence": 0.9,
+  "route": "human_escalation",
+  "action_class": "billing_refund",
+  "blast_radius": "high",
+  "access_gate": {"scope": "cust_alice", "allowed": true},
+  "tool_call": null,
+  "guardrail": {"checked": false, "verdict": "not_reached", "violations": []},
+  "handoff_reason": "billing/plan/payment",
+  "evidence": ["I want a refund on my last bill"]
+}
+```
+
+A turn escalated *before* the compose step (billing, low-confidence, scope,
+unauth) records `guardrail.checked: false` / `verdict: not_reached` rather than
+implying a check that never ran — the ledger can't drift from what the agent
+actually did.
+
+### Latest run
+
+```text
+python3 -m src.eval.handoff_eval
+
+handoff_completeness_rate      : 1.000  (5/5 escalations usable downstream)
+support_outcome_complete_rate  : 1.000  (safe AND usable across the suite)
+review_override_rate           : 0.200  (2/10 escalations a human would automate) †
+post_action_rollback_rate      : 0.200  (1/5 auto-actions undone)              †
+```
+
+`†` Override/rollback labels are **simulated** (`review_outcomes.jsonl`) — they
+demonstrate the two production signals that catch a policy that is too strict
+(over-escalation) or too loose (auto-actions that get rolled back). The metric
+math is real and unit-tested; the labels are not from production traffic.
+
+```bash
+python3 -m src.eval.handoff_eval     # handoff completeness + support outcome + override/rollback
+```
 
 ## Agent evaluation (adversarial + LLM-as-judge)
 
@@ -480,7 +583,7 @@ customer chat turn
                       unverifiable RAG · scope violation · unauthenticated
       │
       ▼
- OBSERVABILITY — per-turn latency built; token/cost dashboards deferred
+ OBSERVABILITY — per-turn latency + audit ledger built; token/cost dashboards deferred
 ```
 
 Deferred (designed, not built): MCP transport wrapper, event bus, token/cost
@@ -497,7 +600,7 @@ src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline
 src/eval/           datasets, finetune export, classifier eval
-src/observability/  latency plumbing now; token/cost dashboards deferred
+src/observability/  latency plumbing + per-turn audit ledger; token/cost dashboards deferred
 src/ui/             Streamlit interactive demo UI (built)
 knowledge_base/     small cited KB
 ```
