@@ -23,6 +23,8 @@ env/
 chroma/
 *.sqlite3
 .chroma/
+var/
+audit_export.*
 
 # OS / editor
 .DS_Store

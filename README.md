@@ -129,6 +129,8 @@ layered, not regex-only. Coverage is locked by regression tests in
 | Action taxonomy / policy table (blast radius · reversibility) | Built (v1.3) |
 | Owner-routed handoff + completeness eval | Built (v1.3) |
 | Review-override / rollback metrics | Built (v1.3, simulated labels) |
+| Durable SQLite audit store + JSONL/CSV export | Built (v1.4) |
+| Decision Console + Human Handoff Queue (Streamlit) | Built (v1.4) |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
 | PR Safety Evidence Gate | Built as CI-only v1.1 workflow |
@@ -383,6 +385,72 @@ math is real and unit-tested; the labels are not from production traffic.
 python3 -m src.eval.handoff_eval     # handoff completeness + support outcome + override/rollback
 ```
 
+## v1.4 Persistent Audit Store + Decision Console
+
+v1.3 produced audit records in memory. v1.4 makes them **durable and
+operational**: every turn is written to SQLite, surfaced in a live Decision
+Console, and exportable as evidence — and escalations become actionable tickets
+in a human handoff queue.
+
+This is the positioning shift: RelayOps is a **real-time telecom support agent
+that makes audited routing decisions, blocks unsafe actions, and creates usable
+human handoffs** — not just a pipeline.
+
+v1.4 adds:
+
+- `src/observability/audit_store.py` — a SQLite-backed `AuditStore` (one flat row
+  per turn) with `--list`, `--stats`, `--export-jsonl`, and `--export-csv`. The
+  row shape is the contract; a real deployment points the same schema at managed
+  Postgres.
+- **Decision Console** tab (Streamlit) — live audit ledger, route distribution,
+  guardrail blocks, unsafe-auto-action / billing-escape counters, handoff
+  completeness, and one-click JSONL/CSV export.
+- **Human Handoff Queue** tab — each escalation rendered as an owner-routed
+  ticket (blocked action · reason · evidence quote · deadline · customer
+  promise) with open/resolved status.
+- `docs/design-partner-notes.md` — a customer-validation log so audit/handoff
+  requirements are driven by real conversations, not guesses.
+- `tests/test_audit_store.py` — schema, export round-trips, and aggregate
+  regression tests.
+
+### CLI
+
+```bash
+python3 -m src.observability.audit_store --list          # recent decisions
+python3 -m src.observability.audit_store --stats          # console aggregates
+python3 -m src.observability.audit_store --export-jsonl   # evidence -> var/audit_export.jsonl
+python3 -m src.observability.audit_store --export-csv     # evidence -> var/audit_export.csv
+```
+
+### v1.4 success metrics (5-turn smoke: billing · reset · FAQ · scope-violation · unauthenticated)
+
+```text
+audit records written     : 5
+route distribution        : human_escalation 3 · auto_action 1 · respond 1
+handoff completeness      : 1.000
+support outcome complete  : 1.000
+unsafe auto-action        : 0.000
+billing escape            : 0.000
+audit export (jsonl/csv)  : pass
+```
+
+The console's safety counters are read straight off the persisted rows: an
+auto-action on a high-blast action class would increment **unsafe auto-action**,
+and a money-touching class that did not escalate would increment **billing
+escape** — both stay at zero.
+
+### Roadmap
+
+```text
+v1.3  audit ledger + handoff evals            ✅
+v1.4  persistent audit store + decision console ✅  (this section)
+v1.5  design-partner workflow importer
+v1.6  observability dashboard (token/cost)
+v2.0  real MCP transport
+v2.1  shadow/canary rollout simulation
+v2.2  operator agent
+```
+
 ## Agent evaluation (adversarial + LLM-as-judge)
 
 Testing the agent is rarer — and more telling — than the agent itself. RelayOps
@@ -583,7 +651,7 @@ customer chat turn
                       unverifiable RAG · scope violation · unauthenticated
       │
       ▼
- OBSERVABILITY — per-turn latency + audit ledger built; token/cost dashboards deferred
+ OBSERVABILITY — latency + durable per-turn audit store + decision console; token/cost dashboards deferred
 ```
 
 Deferred (designed, not built): MCP transport wrapper, event bus, token/cost
@@ -600,7 +668,7 @@ src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline
 src/eval/           datasets, finetune export, classifier eval
-src/observability/  latency plumbing + per-turn audit ledger; token/cost dashboards deferred
-src/ui/             Streamlit interactive demo UI (built)
+src/observability/  latency + per-turn audit ledger + durable SQLite store; token/cost dashboards deferred
+src/ui/             Streamlit UI: Chat + Decision Console + Handoff Queue tabs
 knowledge_base/     small cited KB
 ```
