@@ -12,7 +12,7 @@ This file is our single source of truth for what we are actually building (and w
 ## Final Project Name Decision
 **RelayOps** (chosen from the shortlist: RelayOps, RelayIQ, RelayGuard, TelcoRelay, SignalRelay, etc.)
 
-Reason: Keeps the original "Relay" concept while adding the "Ops" signal that screams production-grade AI engineering — exactly what hiring managers for AI Engineer / Agent Platform / LLMOps roles want to see.
+Reason: Keeps the original "Relay" concept while adding the "Ops" signal for the production-shaped operational concerns this project explores (routing safety, audit trail, handoffs).
 
 ## Codex's Original Review
 See [DESIGN.md](DESIGN.md) for the full design doc and review.
