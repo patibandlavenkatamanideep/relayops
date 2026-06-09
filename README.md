@@ -16,6 +16,7 @@ unsafe, ungrounded, or low-confidence turns are handed to a human.
 | Intent classifier (held-out acc) | keyword 0.506 → Complement NB 0.933 → Qwen LoRA 0.999 ‡ |
 | 100-case adversarial classifier acc | keyword 0.490 → NB 0.660 → **safe calibrated NB 0.880** |
 | v1.2 route safety | **safe-route 1.000**, unsafe auto-action 0.000, billing escape 0.000 — in-distribution (authored cue set); held-out slice holds too (route-correct 0.846). See [honest framing](#honest-framing-of-the-safety-result). |
+| Batch run (50 sample tickets) | **54% auto-resolved**, 0 unsafe auto-action, 0 billing escape, 50/50 audited |
 | Agent safety (deterministic adversarial checks) | **7/7 pass** |
 | Agent response quality (cross-family Gemini LLM-judge) | **6/7 pass, mean 4.6/5**; post-fix rerun pending |
 | Fine-tuned adapter | [published on Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen) |
@@ -131,6 +132,8 @@ layered, not regex-only. Coverage is locked by regression tests in
 | Review-override / rollback metrics | Built (v1.3, simulated labels) |
 | Durable SQLite audit store + JSONL/CSV export | Built (v1.4) |
 | Decision Console + Human Handoff Queue (Streamlit) | Built (v1.4) |
+| Support-ticket batch runner + auto-resolution metrics | Built (v1.5) |
+| Batch Run console tab + time-saved estimate | Built (v1.5) |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
 | PR Safety Evidence Gate | Built as CI-only v1.1 workflow |
@@ -200,6 +203,12 @@ Evaluate handoff completeness, support outcome, and override/rollback metrics:
 
 ```bash
 python3 -m src.eval.handoff_eval
+```
+
+Process a batch of support tickets and report auto-resolution / safety metrics:
+
+```bash
+python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.jsonl
 ```
 
 Train the Qwen LoRA adapter on a GPU machine:
@@ -442,14 +451,82 @@ escape** — both stay at zero.
 ### Roadmap
 
 ```text
-v1.3  audit ledger + handoff evals            ✅
-v1.4  persistent audit store + decision console ✅  (this section)
-v1.5  design-partner workflow importer
-v1.6  observability dashboard (token/cost)
-v2.0  real MCP transport
+v1.3  audit ledger + handoff evals            ✅  can we audit decisions?
+v1.4  persistent audit store + decision console ✅  durable, exportable evidence
+v1.5  support-ticket batch runner             ✅  how much can we safely process?
+v1.6  token/cost observability + cost per resolved ticket   how much per ticket?
+v1.7  design-partner workflow importer (CSV)  can a team test on their own data?
+v2.0  real MCP transport boundary
 v2.1  shadow/canary rollout simulation
 v2.2  operator agent
 ```
+
+## v1.5 Support-Ticket Batch Runner
+
+The business question each version answers: v1.4 was *can we audit decisions?*;
+v1.5 is **how much support work can we safely process?** Instead of one chat
+demo, RelayOps now ingests a queue of support tickets, auto-resolves the
+low-risk reversible ones, escalates billing/account-risk ones, blocks unsafe
+ones, writes an audit record per ticket, and estimates support time saved.
+
+v1.5 adds:
+
+- `src/eval/data/sample_tickets.jsonl` — 50 anonymized sample tickets (resets,
+  status, FAQ, billing/plan, account-access, prompt-injection/cross-customer,
+  out-of-scope, unauthenticated).
+- `src/workflows/ticket_runner.py` — the batch runner + business metrics + CLI.
+- **Batch Run** tab (Streamlit) — "Run sample support queue" → live counts,
+  rates, per-ticket table, and CSV export. The same run feeds the Decision
+  Console and Handoff Queue, so the app behaves like a support-operations console.
+- `tests/test_ticket_runner.py` — partition, safety-invariant, and rate-math tests.
+
+### Run
+
+```bash
+python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.jsonl
+python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.jsonl --export-csv var/batch.csv
+```
+
+### v1.5 success metrics (50 sample tickets, `nb_calibrated`)
+
+```text
+tickets processed         : 50
+audit records written     : 50
+auto-resolved             : 27
+human handoff             : 20
+blocked unsafe            : 3
+auto-resolution rate      : 0.540
+human-escalation rate     : 0.400
+safe-block rate           : 0.060
+unsafe auto-action        : 0.000
+billing escape            : 0.000
+classifier category match : 0.820
+manual time saved (est.)  : 27 × 4 min = 108 min   [illustrative]
+export success            : pass
+```
+
+> **RelayOps safely auto-resolved 54% of the sample queue while escalating every
+> billing/account-risk case — 0 unsafe auto-actions, 0 billing escapes.** The
+> time-saved figure is an explicit *illustrative estimate* (auto-resolved ×
+> 4 min/ticket), not a measured benchmark. Outcome buckets partition the queue:
+> a turn is auto-resolved (responded/acted), a *safe block* (guardrail block or
+> an identity/scope/account-access refusal), or a routine human handoff.
+
+## Looking for design partners
+
+RelayOps can run on a sample of **anonymized** support tickets (CSV/JSONL) and
+produce, per batch:
+
+- an auto-resolution estimate (how much of the queue is safely automatable),
+- escalation reasons (why each ticket needed a human),
+- handoff completeness (does each escalation hand the next human a usable ticket),
+- an audit export (JSONL/CSV decision evidence per turn),
+- unsafe-action metrics (unsafe auto-action / billing-escape counters, kept at 0).
+
+If you run telecom / subscription support and want to see what this looks like
+on your own redacted tickets, that is exactly the kind of conversation tracked
+in [docs/design-partner-notes.md](docs/design-partner-notes.md). Nothing here
+needs production credentials — it runs on a static sample file.
 
 ## Agent evaluation (adversarial + LLM-as-judge)
 
@@ -669,6 +746,7 @@ src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline
 src/eval/           datasets, finetune export, classifier eval
 src/observability/  latency + per-turn audit ledger + durable SQLite store; token/cost dashboards deferred
-src/ui/             Streamlit UI: Chat + Decision Console + Handoff Queue tabs
+src/ui/             Streamlit UI: Chat + Batch Run + Decision Console + Handoff Queue
+src/workflows/      support-ticket batch runner (auto-resolution + safety metrics)
 knowledge_base/     small cited KB
 ```

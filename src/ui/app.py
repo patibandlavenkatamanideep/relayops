@@ -26,6 +26,12 @@ from src.graph.pipeline import handle_turn  # noqa: E402
 from src.observability.audit_ledger import AuditLedger  # noqa: E402
 from src.observability.audit_store import AuditStore  # noqa: E402
 from src.router.registry import get_classifier  # noqa: E402
+from src.workflows.ticket_runner import (  # noqa: E402
+    DEFAULT_TICKETS,
+    MINUTES_PER_TICKET,
+    load_tickets,
+    run_batch,
+)
 
 
 AUTH_OPTIONS = {
@@ -238,6 +244,72 @@ def _render_queue_tab() -> None:
                     st.rerun()
 
 
+# --- batch run -----------------------------------------------------------------
+
+
+def _render_batch_tab() -> None:
+    st.subheader("Batch Run — support queue")
+    st.caption(
+        "Process a queue of support tickets, not one prompt: auto-resolve low-risk "
+        "reversible actions, escalate billing/account-risk, write an audit record "
+        "per ticket, and estimate support time saved."
+    )
+
+    classifier_name = st.session_state.classifier_name
+    if st.button("Run sample support queue", type="primary"):
+        tickets = load_tickets(DEFAULT_TICKETS)
+        with st.spinner(f"processing {len(tickets)} tickets…"):
+            result = run_batch(tickets, classifier_name=classifier_name, store=_store())
+        st.session_state.batch_result = result
+
+    result = st.session_state.get("batch_result")
+    if result is None:
+        st.info(f"Click **Run sample support queue** to process the {_sample_size()} sample tickets.")
+        return
+
+    s = result.summary()
+    row1 = st.columns(3)
+    row1[0].metric("Tickets processed", s["tickets_processed"])
+    row1[1].metric("Auto-resolved", s["auto_resolved"], f"{s['auto_resolution_rate']:.0%}")
+    row1[2].metric("Audit records", s["audit_records_written"])
+
+    row2 = st.columns(3)
+    row2[0].metric("Human handoff", s["human_handoff"], f"{s['human_escalation_rate']:.0%}")
+    row2[1].metric("Blocked unsafe", s["blocked_unsafe"], f"{s['safe_block_rate']:.0%}")
+    row2[2].metric("Time saved (est.)", f"{s['manual_minutes_saved']} min")
+
+    row3 = st.columns(3)
+    row3[0].metric("Unsafe auto-action", s["unsafe_auto_action"])
+    row3[1].metric("Billing escape", s["billing_escape"])
+    row3[2].metric("Classifier category match", f"{s['category_match_rate']:.3f}")
+
+    st.caption(
+        f"Estimated time saved is illustrative: {s['auto_resolved']} auto-resolved "
+        f"× {MINUTES_PER_TICKET} min/ticket. Not a measured figure."
+    )
+
+    st.markdown("**Per-ticket results**")
+    st.dataframe(result.rows, use_container_width=True, hide_index=True)
+
+    csv_header = ",".join(result.rows[0].keys())
+    csv_body = "\n".join(
+        ",".join(str(v).replace(",", " ") for v in r.values()) for r in result.rows
+    )
+    st.download_button(
+        "Download batch results CSV",
+        data=f"{csv_header}\n{csv_body}\n",
+        file_name="relayops_batch_results.csv",
+        mime="text/csv",
+    )
+
+
+def _sample_size() -> int:
+    try:
+        return len(load_tickets(DEFAULT_TICKETS))
+    except Exception:
+        return 0
+
+
 # --- app -----------------------------------------------------------------------
 
 
@@ -282,11 +354,13 @@ def main() -> None:
                 _run_turn(text)
                 st.rerun()
 
-    chat_tab, console_tab, queue_tab = st.tabs(
-        ["Chat", "Decision Console", "Handoff Queue"]
+    chat_tab, batch_tab, console_tab, queue_tab = st.tabs(
+        ["Chat", "Batch Run", "Decision Console", "Handoff Queue"]
     )
     with chat_tab:
         _render_chat_tab()
+    with batch_tab:
+        _render_batch_tab()
     with console_tab:
         _render_console_tab()
     with queue_tab:
