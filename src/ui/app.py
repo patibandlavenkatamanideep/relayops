@@ -317,8 +317,9 @@ def main() -> None:
     st.set_page_config(page_title="RelayOps", layout="wide")
     st.title("RelayOps")
     st.caption(
-        "Real-time telecom support agent: makes audited routing decisions, blocks "
-        "unsafe actions, and creates usable human handoffs."
+        "Support-agent prototype: makes auditable routing decisions, blocks unsafe "
+        "actions, and creates usable human handoffs. Prototype on synthetic / sample "
+        "data — no production users."
     )
 
     st.session_state.setdefault("messages", [])
