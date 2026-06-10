@@ -1,9 +1,20 @@
 # RelayOps
 
-**Production-shaped AI support-agent prototype for telecom/subscription support.**
+**Production-shaped AI support agent for telecom / subscription billing.**<br>
+Scoped tools · fine-tuned intent routing · hybrid RAG · deterministic guardrails · durable audit trail.
 
-Status: **working prototype — v1 vertical slice; Qwen LoRA fine-tune trained,
-evaluated, and [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).**
+Status: **v1.5.1 working prototype** — live Streamlit demo, Decision Console,
+Handoff Queue, support-ticket batch runner, and Qwen LoRA adapter
+[published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
+
+| Signal | Result |
+|---|---|
+| Sample queue | **54% auto-resolved** on 50 tickets |
+| Safety counters | **0 unsafe auto-actions**, **0 billing escapes** |
+| Auditability | Per-turn decision trace + JSONL/CSV export |
+| Demo | [relayops-production.up.railway.app](https://relayops-production.up.railway.app) |
+
+[Live Demo](https://relayops-production.up.railway.app) · [MODEL_CARD.md](MODEL_CARD.md) · [Looking for design partners](#looking-for-design-partners)
 
 > **Honest scope.** This is a prototype evaluated on **synthetic / hand-authored**
 > data and a **sample ticket queue** — there are **no production users** and no
@@ -16,6 +27,23 @@ RelayOps handles customer chat turns through a deterministic access gate, a tier
 intent router, scoped tools, hybrid RAG, and an independent guardrail. The built
 slice focuses on one end-to-end action - **reset my device** - while billing,
 unsafe, ungrounded, or low-confidence turns are handed to a human.
+
+## Table of Contents
+
+- [Results](#results)
+- [Looking for design partners](#looking-for-design-partners)
+- [Live Demo](#live-demo)
+- [Demo Proof](#demo-proof)
+- [Built vs Designed](#built-vs-designed)
+- [Runbook](#runbook)
+- [v1.2 Calibration + Safety Routing](#v12-calibration--safety-routing)
+- [v1.3 Audit Ledger + Handoff-Quality Evals](#v13-audit-ledger--handoff-quality-evals)
+- [v1.4 Persistent Audit Store + Decision Console](#v14-persistent-audit-store--decision-console)
+- [v1.5 Support-Ticket Batch Runner](#v15-support-ticket-batch-runner)
+- [v1.5.1 Decision Trace + Billing/Account Abuse Eval](#v151-decision-trace--billingaccount-abuse-eval)
+- [Agent evaluation](#agent-evaluation-adversarial--llm-as-judge)
+- [Intent Classifier](#intent-classifier)
+- [Architecture](#architecture)
 
 ## Results
 
@@ -38,6 +66,25 @@ the hand-written adversarial accuracy and route-safety rows above. [Why](#readin
 
 Detail in [Intent Classifier](#intent-classifier) and [Agent evaluation](#agent-evaluation-adversarial--llm-as-judge)
 below — including the honest synthetic-data caveat and a real gap the judge caught.
+
+## Looking for design partners
+
+Want to see this on your own data?
+
+Drop a small **redacted** sample of support tickets (CSV/JSONL, 20-100 rows is
+enough) and I will run the full RelayOps batch evaluation and send back:
+
+- auto-resolution estimate,
+- per-ticket decision traces + audit export,
+- handoff completeness report,
+- escalation reasons,
+- unsafe-action counters,
+- time-saved estimate.
+
+No credentials, no production access, no strings attached. Reply wherever you
+found this project, open an issue, or use
+[docs/design-partner-notes.md](docs/design-partner-notes.md) as the template for
+the conversation.
 
 ## Live Demo
 
@@ -591,22 +638,6 @@ verification_bypass_block_rate: 1.000 (4/4)
 
 Here "block" means blocked from automated resolution and escalated/handoffed for
 human review; it does not mean the customer is dropped on the floor.
-
-## Looking for design partners
-
-RelayOps can run on a sample of **anonymized** support tickets (CSV/JSONL) and
-produce, per batch:
-
-- an auto-resolution estimate (how much of the queue is safely automatable),
-- escalation reasons (why each ticket needed a human),
-- handoff completeness (does each escalation hand the next human a usable ticket),
-- an audit export (JSONL/CSV decision evidence per turn),
-- unsafe-action metrics (unsafe auto-action / billing-escape counters, kept at 0).
-
-If you run telecom / subscription support and want to see what this looks like
-on your own redacted tickets, that is exactly the kind of conversation tracked
-in [docs/design-partner-notes.md](docs/design-partner-notes.md). Nothing here
-needs production credentials — it runs on a static sample file.
 
 ## Agent evaluation (adversarial + LLM-as-judge)
 
