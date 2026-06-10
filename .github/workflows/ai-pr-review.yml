@@ -83,6 +83,11 @@ jobs:
             run_calibration_eval="true"
           fi
 
+          run_billing_abuse_eval="false"
+          if [[ "$classifier_metrics" == "true" || "$router_or_graph" == "true" || "$evals_or_tests" == "true" ]]; then
+            run_billing_abuse_eval="true"
+          fi
+
           {
             echo "access_gate=$access_gate"
             echo "scoped_tools=$scoped_tools"
@@ -94,6 +99,7 @@ jobs:
             echo "run_agent_eval=$run_agent_eval"
             echo "run_intent_eval=$run_intent_eval"
             echo "run_calibration_eval=$run_calibration_eval"
+            echo "run_billing_abuse_eval=$run_billing_abuse_eval"
           } >> "$GITHUB_OUTPUT"
 
       - name: Run unit tests
@@ -145,6 +151,20 @@ jobs:
           echo "No router/classifier/eval paths changed; calibration eval not required." \
             | tee /tmp/relayops_calibration_eval.txt
 
+      - name: Run billing/account abuse eval
+        id: billing_abuse_eval
+        if: steps.detect.outputs.run_billing_abuse_eval == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m src.eval.eval_billing_abuse | tee /tmp/relayops_billing_abuse_eval.txt
+
+      - name: Skip billing/account abuse eval
+        if: steps.detect.outputs.run_billing_abuse_eval != 'true'
+        run: |
+          echo "No router/classifier/eval paths changed; billing abuse eval not required." \
+            | tee /tmp/relayops_billing_abuse_eval.txt
+
       - name: Build PR review report
         if: always()
         shell: bash
@@ -195,6 +215,8 @@ jobs:
             echo "- Intent classifier eval outcome: ${{ steps.intent_eval.outcome || 'skipped' }}"
             echo "- Calibration/safety eval required: ${{ steps.detect.outputs.run_calibration_eval }}"
             echo "- Calibration/safety eval outcome: ${{ steps.calibration_eval.outcome || 'skipped' }}"
+            echo "- Billing/account abuse eval required: ${{ steps.detect.outputs.run_billing_abuse_eval }}"
+            echo "- Billing/account abuse eval outcome: ${{ steps.billing_abuse_eval.outcome || 'skipped' }}"
             echo
             echo "### Changed files"
             sed 's/^/- `/' /tmp/relayops_changed_files.txt | sed 's/$/`/'
@@ -266,6 +288,11 @@ jobs:
 
           if [[ "${{ steps.detect.outputs.run_calibration_eval }}" == "true" && "${{ steps.calibration_eval.outcome }}" != "success" ]]; then
             echo "Required calibration/safety eval failed."
+            failed="true"
+          fi
+
+          if [[ "${{ steps.detect.outputs.run_billing_abuse_eval }}" == "true" && "${{ steps.billing_abuse_eval.outcome }}" != "success" ]]; then
+            echo "Required billing/account abuse eval failed."
             failed="true"
           fi
 

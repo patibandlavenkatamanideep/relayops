@@ -26,6 +26,8 @@ class AuditLedgerSchemaTests(unittest.TestCase):
         "turn_id", "timestamp", "customer_id", "authenticated", "intent",
         "classifier", "confidence", "route", "action_class", "blast_radius",
         "access_gate", "tool_call", "guardrail", "handoff_reason", "evidence",
+        "decision_steps", "proposed_action", "blocking_rule", "risk_signal",
+        "available_context", "unavailable_context",
     }
 
     def test_record_has_full_schema(self):
@@ -47,6 +49,26 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertEqual(rec["guardrail"]["verdict"], "not_reached")
         self.assertIn("refund", rec["evidence"][0].lower())
         self.assertEqual(rec["handoff_reason"], "billing/plan/payment")
+        self.assertEqual(rec["proposed_action"], "refund_review")
+        self.assertEqual(rec["blocking_rule"], "billing_refund_requires_human")
+        self.assertEqual(rec["risk_signal"], "money_touching_request")
+        self.assertIn("customer_id", rec["available_context"])
+        self.assertIn("message", rec["available_context"])
+        self.assertIn("device_scope", rec["available_context"])
+        self.assertIn("billing_history", rec["unavailable_context"])
+        self.assertIn("payment_method", rec["unavailable_context"])
+        self.assertIn("prior_agent_promises", rec["unavailable_context"])
+
+        steps = rec["decision_steps"]
+        self.assertEqual([s["stage"] for s in steps], [
+            "access_gate", "classifier", "policy", "tool_permission", "handoff"
+        ])
+        self.assertEqual(steps[0]["result"], "allowed")
+        self.assertEqual(steps[0]["scope"], "cust_alice")
+        self.assertEqual(steps[2]["rule"], "billing_refund_requires_human")
+        self.assertFalse(steps[3]["allowed"])
+        self.assertEqual(steps[3]["reason"], "billing action not auto-executable")
+        self.assertEqual(steps[4]["owner"], "billing_support")
 
     def test_reset_turn_records_tool_call_and_auto_action(self):
         rec = _turn("my router isn't working, can you reset it?", auth_token="tok_alice")
@@ -57,6 +79,7 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertTrue(rec["tool_call"]["ok"])
         self.assertTrue(rec["guardrail"]["checked"])
         self.assertEqual(rec["guardrail"]["verdict"], "pass")
+        self.assertIsNone(rec["blocking_rule"])
 
     def test_faq_turn_records_respond_and_citation_evidence(self):
         rec = _turn("how long does a device reset take?", auth_token="tok_alice")

@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -74,12 +75,22 @@ class AuditStoreTests(unittest.TestCase):
         self.assertEqual(len(lines), len(TURNS))
         parsed = json.loads(lines[0])
         self.assertIn("action_class", parsed)
+        self.assertIn("decision_steps", parsed)
 
     def test_csv_export_has_header_and_rows(self):
         _populate(self.store)
         reader = list(csv.DictReader(io.StringIO(self.store.to_csv())))
         self.assertEqual(len(reader), len(TURNS))
         self.assertEqual(set(reader[0].keys()), set(COLUMNS))
+        self.assertTrue(json.loads(reader[0]["decision_steps"]))
+
+    def test_trace_fields_are_persisted(self):
+        _populate(self.store)
+        row = self.store.all()[0]
+        self.assertEqual(row["proposed_action"], "refund_review")
+        self.assertEqual(row["blocking_rule"], "billing_refund_requires_human")
+        self.assertEqual(row["risk_signal"], "money_touching_request")
+        self.assertIn("billing_history", json.loads(row["unavailable_context"]))
 
     def test_export_to_file(self):
         _populate(self.store)
@@ -113,6 +124,21 @@ class AuditStoreTests(unittest.TestCase):
         stats = self.store.stats()
         self.assertEqual(stats["audit_records"], 0)
         self.assertEqual(stats["handoff_completeness"], 1.0)  # vacuously complete
+
+    def test_existing_db_is_migrated_with_trace_columns(self):
+        old_db = Path(self.tmp.name) / "old.sqlite3"
+        conn = sqlite3.connect(old_db)
+        conn.execute("CREATE TABLE audit_turns (id INTEGER PRIMARY KEY AUTOINCREMENT, turn_id TEXT)")
+        conn.commit()
+        conn.close()
+
+        migrated = AuditStore(old_db)
+        try:
+            columns = {row["name"] for row in migrated.conn.execute("PRAGMA table_info(audit_turns)")}
+            self.assertIn("decision_steps", columns)
+            self.assertIn("unavailable_context", columns)
+        finally:
+            migrated.close()
 
 
 if __name__ == "__main__":

@@ -75,6 +75,146 @@ def _evidence(state: TurnState, response: AgentResponse) -> list[str]:
     return evidence
 
 
+_POLICY_RULES = {
+    action_policy.ActionClass.DEVICE_RESET: "device_reset_allowed_after_auth",
+    action_policy.ActionClass.SEND_TROUBLESHOOTING_LINK: "faq_requires_grounding",
+    action_policy.ActionClass.ACCOUNT_READ: "account_read_requires_authenticated_scope",
+    action_policy.ActionClass.BILLING_REFUND: "billing_refund_requires_human",
+    action_policy.ActionClass.PLAN_CHANGE: "plan_change_requires_human",
+    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: "account_access_requires_verification",
+    action_policy.ActionClass.UNKNOWN: "unsupported_or_low_confidence_requires_human",
+}
+
+_PROPOSED_ACTIONS = {
+    action_policy.ActionClass.DEVICE_RESET: "device_reset",
+    action_policy.ActionClass.SEND_TROUBLESHOOTING_LINK: "faq_response",
+    action_policy.ActionClass.ACCOUNT_READ: "account_status_lookup",
+    action_policy.ActionClass.BILLING_REFUND: "refund_review",
+    action_policy.ActionClass.PLAN_CHANGE: "plan_change_review",
+    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: "identity_or_scope_review",
+    action_policy.ActionClass.UNKNOWN: "support_review",
+}
+
+_RISK_SIGNALS = {
+    action_policy.ActionClass.DEVICE_RESET: "low_risk_reversible_device_action",
+    action_policy.ActionClass.SEND_TROUBLESHOOTING_LINK: "grounded_information_request",
+    action_policy.ActionClass.ACCOUNT_READ: "read_only_account_request",
+    action_policy.ActionClass.BILLING_REFUND: "money_touching_request",
+    action_policy.ActionClass.PLAN_CHANGE: "money_touching_request",
+    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: "identity_or_scope_request",
+    action_policy.ActionClass.UNKNOWN: "unsupported_or_uncertain_request",
+}
+
+_UNAVAILABLE_CONTEXT = {
+    action_policy.ActionClass.BILLING_REFUND: [
+        "billing_history",
+        "payment_method",
+        "prior_agent_promises",
+    ],
+    action_policy.ActionClass.PLAN_CHANGE: [
+        "current_contract_terms",
+        "retention_offer_policy",
+        "billing_history",
+    ],
+    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: [
+        "identity_verification",
+        "authorized_third_party_permission",
+        "account_admin_history",
+    ],
+    action_policy.ActionClass.UNKNOWN: ["specialist_domain_context"],
+}
+
+
+def _available_context(state: TurnState) -> list[str]:
+    context = ["message"]
+    if state.access and state.access.customer_id:
+        context.append("customer_id")
+    if state.access and state.access.authenticated:
+        context.append("device_scope")
+    if state.tool_results:
+        context.append("tool_result")
+    if state.retrieved:
+        context.append("kb_citations")
+    return context
+
+
+def _tool_permission_reason(
+    action: action_policy.ActionClass, tool: Optional[dict[str, Any]]
+) -> str:
+    if action == action_policy.ActionClass.BILLING_REFUND:
+        return "billing action not auto-executable"
+    if action == action_policy.ActionClass.PLAN_CHANGE:
+        return "plan change not auto-executable"
+    if action == action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE:
+        return "account/identity action requires verification"
+    if tool:
+        return tool.get("error") or "allowed"
+    return "no_tool_required"
+
+
+def _decision_steps(
+    *,
+    state: TurnState,
+    response: AgentResponse,
+    route_label: str,
+    action: action_policy.ActionClass,
+    rule: str,
+    tool: Optional[dict[str, Any]],
+    access_gate: dict[str, Any],
+) -> list[dict[str, Any]]:
+    handoff = response.handoff_context or {}
+    confidence = round(state.classification.confidence, 2) if state.classification else 0.0
+    allowed = bool(access_gate["allowed"])
+    steps: list[dict[str, Any]] = [
+        {
+            "stage": "access_gate",
+            "result": "allowed" if allowed else "blocked",
+            "scope": access_gate.get("scope"),
+        },
+        {
+            "stage": "classifier",
+            "intent": response.intent.value,
+            "confidence": confidence,
+        },
+        {
+            "stage": "policy",
+            "rule": rule,
+            "route": route_label,
+        },
+    ]
+
+    tool_allowed = bool(tool and tool.get("ok") and route_label == "auto_action")
+    steps.append(
+        {
+            "stage": "tool_permission",
+            "allowed": tool_allowed,
+            "reason": _tool_permission_reason(action, tool),
+        }
+    )
+
+    if response.guardrail_action != "pass" or response.guardrail_violations:
+        steps.append(
+            {
+                "stage": "guardrail",
+                "result": response.guardrail_action,
+                "violations": list(response.guardrail_violations),
+            }
+        )
+
+    if route_label == "human_escalation":
+        steps.append(
+            {
+                "stage": "handoff",
+                "owner": handoff.get("owner", ""),
+                "deadline": handoff.get("deadline", ""),
+            }
+        )
+    else:
+        steps.append({"stage": "response", "result": route_label})
+
+    return steps
+
+
 @dataclass
 class AuditRecord:
     """One row of the decision trail. ``to_dict`` is the canonical wire form."""
@@ -94,6 +234,12 @@ class AuditRecord:
     guardrail: dict[str, Any]
     handoff_reason: Optional[str]
     evidence: list[str]
+    decision_steps: list[dict[str, Any]]
+    proposed_action: str
+    blocking_rule: Optional[str]
+    risk_signal: str
+    available_context: list[str]
+    unavailable_context: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -112,6 +258,12 @@ class AuditRecord:
             "guardrail": self.guardrail,
             "handoff_reason": self.handoff_reason,
             "evidence": self.evidence,
+            "decision_steps": self.decision_steps,
+            "proposed_action": self.proposed_action,
+            "blocking_rule": self.blocking_rule,
+            "risk_signal": self.risk_signal,
+            "available_context": self.available_context,
+            "unavailable_context": self.unavailable_context,
         }
 
 
@@ -133,6 +285,8 @@ def build_record(
     reason = (response.handoff_context or {}).get("reason", "")
     action = action_policy.classify_action(response.intent, reason)
     policy = action_policy.policy_for(action)
+    rule = _POLICY_RULES[action]
+    route_label = _route_label(response, tool is not None)
 
     # The gate allowed the requested scope unless the turn was blocked for an
     # access reason (cross-customer scope violation or unauthenticated caller).
@@ -141,6 +295,7 @@ def build_record(
         "scope": customer_id,
         "allowed": authenticated and not scope_blocked,
     }
+    blocking_rule = rule if route_label == "human_escalation" else None
 
     return AuditRecord(
         turn_id=uuid.uuid4().hex[:12],
@@ -150,7 +305,7 @@ def build_record(
         intent=response.intent.value,
         classifier=classifier_name,
         confidence=confidence,
-        route=_route_label(response, tool is not None),
+        route=route_label,
         action_class=action.value,
         blast_radius=policy.blast_radius.value,
         access_gate=access_gate,
@@ -158,6 +313,20 @@ def build_record(
         guardrail=_guardrail(response),
         handoff_reason=reason or None,
         evidence=_evidence(state, response),
+        decision_steps=_decision_steps(
+            state=state,
+            response=response,
+            route_label=route_label,
+            action=action,
+            rule=rule,
+            tool=tool,
+            access_gate=access_gate,
+        ),
+        proposed_action=_PROPOSED_ACTIONS[action],
+        blocking_rule=blocking_rule,
+        risk_signal=_RISK_SIGNALS[action],
+        available_context=_available_context(state),
+        unavailable_context=list(_UNAVAILABLE_CONTEXT.get(action, [])),
     )
 
 

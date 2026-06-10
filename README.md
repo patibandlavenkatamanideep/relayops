@@ -25,6 +25,7 @@ unsafe, ungrounded, or low-confidence turns are handed to a human.
 | 100-case adversarial classifier acc | keyword 0.490 → NB 0.660 → **safe calibrated NB 0.880** |
 | v1.2 route safety | **safe-route 1.000**, unsafe auto-action 0.000, billing escape 0.000 — in-distribution (authored cue set); held-out slice holds too (route-correct 0.846). See [honest framing](#honest-framing-of-the-safety-result). |
 | Batch run (50 sample tickets) | **54% auto-resolved**, 0 unsafe auto-action, 0 billing escape, 50/50 audited |
+| Billing/account abuse eval | **billing_escape_rate 0.000**; credit-attempt block 1.000, social-engineering escalation 1.000, verification-bypass block 1.000 |
 | Agent safety (deterministic adversarial checks) | **7/7 pass** |
 | Agent response quality (cross-family Gemini LLM-judge) | **6/7 pass, mean 4.6/5**; post-fix rerun pending |
 | Fine-tuned adapter | [published on Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen) |
@@ -142,6 +143,8 @@ layered, not regex-only. Coverage is locked by regression tests in
 | Decision Console + Human Handoff Queue (Streamlit) | Built (v1.4) |
 | Support-ticket batch runner + auto-resolution metrics | Built (v1.5) |
 | Batch Run console tab + time-saved estimate | Built (v1.5) |
+| Decision trace + unavailable-context audit fields | Built (v1.5.1) |
+| Adversarial billing/account abuse eval | Built (v1.5.1) |
 | Adversarial agent eval + LLM-as-judge | Built |
 | Streamlit interactive demo UI | Built |
 | PR Safety Evidence Gate | Built as CI-only v1.1 workflow |
@@ -217,6 +220,12 @@ Process a batch of support tickets and report auto-resolution / safety metrics:
 
 ```bash
 python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.jsonl
+```
+
+Evaluate adversarial billing/account abuse tickets:
+
+```bash
+python3 -m src.eval.eval_billing_abuse
 ```
 
 Train the Qwen LoRA adapter on a GPU machine:
@@ -461,8 +470,9 @@ escape** — both stay at zero.
 v1.3  audit ledger + handoff evals            ✅  can we audit decisions?
 v1.4  persistent audit store + decision console ✅  durable, exportable evidence
 v1.5  support-ticket batch runner             ✅  how much can we safely process?
-v1.6  token/cost observability + cost per resolved ticket   how much per ticket?
-v1.7  design-partner workflow importer (CSV)  can a team test on their own data?
+v1.5.1 decision trace + billing/account abuse eval ✅ why did this decision happen?
+v1.6  cost per resolved ticket                how much per ticket?
+v1.7  design-partner CSV importer             can a team test on their own data?
 v2.0  real MCP transport boundary
 v2.1  shadow/canary rollout simulation
 v2.2  operator agent
@@ -518,6 +528,69 @@ export success            : pass
 > 4 min/ticket), not a measured benchmark. Outcome buckets partition the queue:
 > a turn is auto-resolved (responded/acted), a *safe block* (guardrail block or
 > an identity/scope/account-access refusal), or a routine human handoff.
+
+## v1.5.1 Decision Trace + Billing/Account Abuse Eval
+
+v1.5.1 keeps the product scope small and strengthens the operational proof.
+RelayOps now records not only what evidence was used, but what context was
+unavailable at decision time. This matters for disputes: an audit record should
+show both the basis of the decision and the limits of the agent's knowledge.
+
+The key support-buyer questions this answers:
+
+- Can the human continue from the handoff without rereading everything?
+- Can compliance reconstruct why the decision happened?
+- Can the system resist bad-faith billing/account requests?
+
+Every `AuditRecord` now includes:
+
+- `decision_steps` — access gate, classifier, policy, tool permission, guardrail
+  when reached, and response/handoff.
+- `proposed_action` — e.g. `refund_review`, `device_reset`,
+  `identity_or_scope_review`.
+- `blocking_rule` — e.g. `billing_refund_requires_human`.
+- `risk_signal` — e.g. `money_touching_request`.
+- `available_context` and `unavailable_context` — what the agent did and did not
+  know when it made the decision.
+
+Example billing trace:
+
+```json
+{
+  "decision_steps": [
+    {"stage": "access_gate", "result": "allowed", "scope": "cust_alice"},
+    {"stage": "classifier", "intent": "billing", "confidence": 0.9},
+    {"stage": "policy", "rule": "billing_refund_requires_human", "route": "human_escalation"},
+    {"stage": "tool_permission", "allowed": false, "reason": "billing action not auto-executable"},
+    {"stage": "handoff", "owner": "billing_support", "deadline": "next available billing specialist"}
+  ],
+  "proposed_action": "refund_review",
+  "blocking_rule": "billing_refund_requires_human",
+  "risk_signal": "money_touching_request",
+  "available_context": ["message", "customer_id", "device_scope"],
+  "unavailable_context": ["billing_history", "payment_method", "prior_agent_promises"]
+}
+```
+
+v1.5.1 also adds `src/eval/data/adversarial_billing_tickets.jsonl`, a 12-case
+billing/account abuse suite covering unauthorized credits, social engineering,
+verification bypass, neighbor/account access, hidden offers, employee discounts,
+and "do not escalate" pressure.
+
+Latest run:
+
+```text
+python3 -m src.eval.eval_billing_abuse
+
+adversarial billing/account cases: 12
+billing_escape_rate: 0.000 (0/12)
+unauthorized_credit_attempt_block_rate: 1.000 (5/5)
+social_engineering_escalation_rate: 1.000 (3/3)
+verification_bypass_block_rate: 1.000 (4/4)
+```
+
+Here "block" means blocked from automated resolution and escalated/handoffed for
+human review; it does not mean the customer is dropped on the floor.
 
 ## Looking for design partners
 
