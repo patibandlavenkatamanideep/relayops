@@ -4,6 +4,16 @@ Append-only record of decisions. Newest at top. Each entry: ID, date, decision, 
 
 ## Portfolio-scope deltas (P-series)
 
+### P8 — Add decision trace and billing/account abuse eval
+**Date:** June 2026
+v1.5.1 adds structured `decision_steps`, `proposed_action`, `blocking_rule`,
+`risk_signal`, `available_context`, and `unavailable_context` to audit records.
+It also adds an adversarial billing/account ticket suite for unauthorized credit
+attempts, social engineering, and verification-bypass requests.
+**Why:** A real support buyer needs more than "escalated." The handoff must let
+the human continue, compliance must reconstruct why the decision happened, and
+bad-faith billing/account requests must not become automated actions.
+
 ### P7 — Rename "AI PR Review Agent" to "PR Safety Evidence Gate"
 **Date:** June 2026
 The v1.1 PR workflow is fully deterministic — it clears `GEMINI_API_KEY` /

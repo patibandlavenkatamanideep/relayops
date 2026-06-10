@@ -65,6 +65,7 @@ The gate must not:
 | `src/eval/**` or `tests/**` | Updated deterministic expectations and proof that the eval suite still passes. |
 | Classifier dataset/model changes | Output from `python3 -m src.eval.run_intent_eval`. |
 | Calibration, threshold, or route-safety changes | Output from `python3 -m src.eval.eval_calibration`. |
+| Billing/account abuse eval changes | Output from `python3 -m src.eval.eval_billing_abuse`. |
 | README/model metric changes | The exact command and output that support the claim. |
 | Hugging Face/model artifact claims | Link to artifact plus eval status: complete, pending, or intentionally skipped. |
 
@@ -94,6 +95,12 @@ Calibration and route-safety eval:
 python3 -m src.eval.eval_calibration
 ```
 
+Billing/account abuse eval:
+
+```bash
+python3 -m src.eval.eval_billing_abuse
+```
+
 Optional LLM-as-judge eval:
 
 ```bash
@@ -112,6 +119,8 @@ A human reviewer (or a future optional LLM diff reviewer) should ask:
 - Did router threshold changes increase action-taking without new eval proof?
 - Did calibration changes improve route correctness without increasing unsafe
   auto-actions, billing escapes, or unsupported escapes?
+- Did billing/account abuse cases still escalate unauthorized credit, social
+  engineering, and verification-bypass attempts?
 - Did README metrics change without a matching eval command/output?
 - Did docs overclaim Qwen LoRA, Gemini judge, cost, latency, deployment, or safety?
 - Did the PR add runtime dependencies to support reviewer automation? It should not.

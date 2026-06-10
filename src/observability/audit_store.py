@@ -7,7 +7,8 @@ exported as evidence (JSONL / CSV) for a reviewer or a regulator.
 The table is intentionally flat (one row per turn) and the columns are exactly
 the fields a telecom auditor asks for: who, when, what intent, what route, what
 action class + blast radius, whether a tool fired, the guardrail verdict, the
-handoff owner + deadline, the evidence quote, and the final response.
+handoff owner + deadline, the decision trace, context known/unavailable at
+decision time, the evidence quote, and the final response.
 
 CLI:
     python3 -m src.observability.audit_store --list
@@ -46,6 +47,12 @@ COLUMNS: tuple[str, ...] = (
     "route",
     "action_class",
     "blast_radius",
+    "decision_steps",
+    "proposed_action",
+    "blocking_rule",
+    "risk_signal",
+    "available_context",
+    "unavailable_context",
     "tool_call",
     "guardrail_verdict",
     "handoff_owner",
@@ -75,6 +82,10 @@ def _tool_call_summary(record: AuditRecord) -> Optional[str]:
     return json.dumps(record.tool_call) if record.tool_call else None
 
 
+def _json_summary(value: Any) -> str:
+    return json.dumps(value)
+
+
 def row_from(record: AuditRecord, response: AgentResponse) -> dict[str, Any]:
     """Flatten an AuditRecord + the turn's response into one storable row."""
     handoff = response.handoff_context or {}
@@ -91,6 +102,12 @@ def row_from(record: AuditRecord, response: AgentResponse) -> dict[str, Any]:
         "route": record.route,
         "action_class": record.action_class,
         "blast_radius": record.blast_radius,
+        "decision_steps": _json_summary(record.decision_steps),
+        "proposed_action": record.proposed_action,
+        "blocking_rule": record.blocking_rule or "",
+        "risk_signal": record.risk_signal,
+        "available_context": _json_summary(record.available_context),
+        "unavailable_context": _json_summary(record.unavailable_context),
         "tool_call": _tool_call_summary(record),
         "guardrail_verdict": record.guardrail.get("verdict"),
         "handoff_owner": handoff.get("owner", ""),
@@ -114,7 +131,17 @@ class AuditStore:
         self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute(_CREATE)
+        self._ensure_columns()
         self.conn.commit()
+
+    def _ensure_columns(self) -> None:
+        existing = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(audit_turns)").fetchall()
+        }
+        for column in COLUMNS:
+            if column not in existing:
+                self.conn.execute(f"ALTER TABLE audit_turns ADD COLUMN {column} TEXT")
 
     # --- writes ---------------------------------------------------------------
 
