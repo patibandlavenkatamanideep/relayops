@@ -186,6 +186,23 @@ python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.json
 python3 -m src.workflows.ticket_runner --input src/eval/data/sample_tickets.jsonl --export-csv var/batch.csv
 ```
 
+Validate against a **downloaded public dataset** (import → normalize → run):
+
+```bash
+# 1. import a downloaded Kaggle / Hugging Face / Twitter support dataset
+python3 -m src.workflows.importers.kaggle_support  --input tickets.csv  --output var/imported_public_tickets.jsonl
+python3 -m src.workflows.importers.hf_support       --input tickets.jsonl --output var/imported_public_tickets.jsonl
+python3 -m src.workflows.importers.twitter_support  --input twcs.csv     --output var/imported_public_tickets.jsonl
+
+# 2. run the same audit/safety/handoff evaluation on it
+python3 -m src.workflows.ticket_runner \
+  --input var/imported_public_tickets.jsonl \
+  --classifier nb_calibrated --assume-customer cust_alice --source kaggle
+```
+
+See [Public-dataset validation](#public-dataset-validation) for what this is — and
+is not.
+
 Train or evaluate the Qwen LoRA adapter:
 
 ```bash
@@ -207,6 +224,33 @@ railway open
 Railway reads [railway.toml](railway.toml), builds the [Dockerfile](Dockerfile),
 and starts Streamlit on `0.0.0.0:$PORT`.
 
+## Public-dataset validation
+
+RelayOps can ingest **downloaded** public support-ticket datasets and run the same
+audit / safety / handoff evaluation as the hand-authored queue — no network fetch,
+no manual queue authoring. Importers in [src/workflows/importers/](src/workflows/importers/)
+map each dataset onto one canonical schema
+([normalize_ticket.py](src/workflows/normalize_ticket.py)):
+
+| Source | Importer | Notes |
+|---|---|---|
+| Kaggle "Customer Support Ticket Dataset" | `kaggle_support` | subject + description → message |
+| Hugging Face helpdesk tickets | `hf_support` | subject/body, queue/type as category |
+| Customer Support on Twitter | `twitter_support` | inbound (customer) tweets only; messy real language |
+
+The runner reports per-dataset: tickets processed, auto-resolution rate, handoff
+rate, **unsafe auto-action**, **billing escape**, unsupported rate (intent the v1
+slice can't action), and the **top failure categories**.
+
+> **What this is — and is not.** This is **public-dataset validation**: evidence
+> that the importer, schema, routing, and safety counters hold up on external,
+> messy language. It is **not design-partner data and not production traffic**.
+> Public tickets carry no real identity, so they are authenticated under a
+> sandbox customer (`--assume-customer`) purely to exercise the decision path —
+> the auto-resolution numbers are a *capacity illustration on generic data*, not a
+> domain benchmark. Real validation still requires a redacted design-partner
+> queue (see [Looking for design partners](#looking-for-design-partners)).
+
 ## Built Vs Deferred
 
 | Built | Deferred / designed |
@@ -218,7 +262,8 @@ and starts Streamlit on `0.0.0.0:$PORT`.
 | Offer/PII/tone guardrail | Shadow/canary rollout |
 | Durable audit store + Decision Console | Hermes-style operator agent |
 | Human Handoff Queue | Production traffic validation |
-| Support-ticket batch runner | Design-partner CSV importer |
+| Support-ticket batch runner | Cost per resolved ticket |
+| Public-dataset importers (Kaggle/HF/Twitter) | Design-partner redacted-queue run |
 | CI-only PR Safety Evidence Gate | 100-case Qwen adversarial rerun |
 
 The PR Safety Evidence Gate is advisory and CI-only. It checks risky changes to
@@ -295,8 +340,9 @@ it still cannot widen its own permissions.
 | v1.4 | persistent audit store + Decision Console | shipped |
 | v1.5 | support-ticket batch runner | shipped |
 | v1.5.1 | decision trace + billing/account abuse eval | shipped |
-| v1.6 | cost per resolved ticket | next |
-| v1.7 | design-partner CSV importer | planned |
+| v1.6 | public-dataset importer + external-data validation | shipped |
+| v1.7 | cost per resolved ticket | next |
+| v1.8 | design-partner redacted-queue run | planned |
 | v2.0 | real MCP transport boundary | planned |
 
 ## Limitations
@@ -324,7 +370,7 @@ src/graph/          synchronous graph-shaped pipeline
 src/eval/           datasets, finetune export, classifier/agent evals
 src/observability/  audit ledger, SQLite store, exports
 src/ui/             Streamlit Chat, Batch Run, Decision Console, Handoff Queue
-src/workflows/      support-ticket batch runner
+src/workflows/      support-ticket batch runner + public-dataset importers
 knowledge_base/     small cited KB
 ```
 

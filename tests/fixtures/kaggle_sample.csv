@@ -1,0 +1,7 @@
+Ticket ID,Ticket Subject,Ticket Description,Ticket Type,Ticket Priority,Ticket Status
+1,Router not working,my router is offline can you reset it,Technical issue,High,Open
+2,Refund request,I want a refund on my last bill,Billing inquiry,Medium,Open
+3,Device status,is my router online right now,Technical issue,Low,Open
+4,Reset time,how long does a device reset take,Technical issue,Low,Open
+5,,,Technical issue,Low,Open
+6,Cancel,book me a flight to chicago,Other,Low,Open

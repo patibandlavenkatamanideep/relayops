@@ -20,6 +20,7 @@ Run:
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -73,6 +74,7 @@ def classify_outcome(record: AuditRecord, response: AgentResponse) -> str:
 class BatchResult:
     rows: list[dict[str, Any]] = field(default_factory=list)
     records: list[AuditRecord] = field(default_factory=list)
+    source: Optional[str] = None
 
     # counts
     total: int = 0
@@ -81,8 +83,10 @@ class BatchResult:
     blocked_unsafe: int = 0
     unsafe_auto_action: int = 0
     billing_escape: int = 0
+    unsupported: int = 0
     category_matches: int = 0
     category_scored: int = 0
+    failure_reasons: Counter = field(default_factory=Counter)
 
     @property
     def auto_resolution_rate(self) -> float:
@@ -97,6 +101,12 @@ class BatchResult:
         return self.blocked_unsafe / self.total if self.total else 0.0
 
     @property
+    def unsupported_rate(self) -> float:
+        """Share of tickets outside the v1 supported intent set (intent=unknown)
+        — the work the current slice can't action, only escalate."""
+        return self.unsupported / self.total if self.total else 0.0
+
+    @property
     def category_match_rate(self) -> float:
         return self.category_matches / self.category_scored if self.category_scored else 0.0
 
@@ -104,8 +114,13 @@ class BatchResult:
     def manual_minutes_saved(self) -> int:
         return self.auto_resolved * MINUTES_PER_TICKET
 
+    def top_failure_categories(self, n: int = 5) -> list[tuple[str, int]]:
+        """Most common reasons a ticket was not auto-resolved."""
+        return self.failure_reasons.most_common(n)
+
     def summary(self) -> dict[str, Any]:
         return {
+            "source": self.source,
             "tickets_processed": self.total,
             "audit_records_written": len(self.records),
             "auto_resolved": self.auto_resolved,
@@ -116,8 +131,10 @@ class BatchResult:
             "safe_block_rate": round(self.safe_block_rate, 3),
             "unsafe_auto_action": self.unsafe_auto_action,
             "billing_escape": self.billing_escape,
+            "unsupported_rate": round(self.unsupported_rate, 3),
             "category_match_rate": round(self.category_match_rate, 3),
             "manual_minutes_saved": self.manual_minutes_saved,
+            "top_failure_categories": self.top_failure_categories(),
         }
 
 
@@ -125,18 +142,27 @@ def run_batch(
     tickets: list[dict[str, Any]],
     classifier_name: str = "nb_calibrated",
     store: Any | None = None,
+    assume_customer: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> BatchResult:
     """Process every ticket end-to-end. If ``store`` is given (an AuditStore),
-    each turn's audit record is also persisted durably."""
+    each turn's audit record is also persisted durably.
+
+    ``assume_customer`` supplies a sandbox auth identity for tickets whose own
+    ``customer_id`` doesn't resolve to a token (i.e. imported public data). This
+    lets routing/safety/handoff run on real language without faking that the
+    ticket came from a verified account — it stays labeled as public-data
+    validation, not production traffic."""
 
     classifier = get_classifier(classifier_name)
-    result = BatchResult()
+    assume_token = token_for(assume_customer) if assume_customer else None
+    result = BatchResult(source=source)
 
     for t in tickets:
         ledger = AuditLedger()
         response = handle_turn(
             t["message"],
-            auth_token=token_for(t.get("customer_id")),
+            auth_token=token_for(t.get("customer_id")) or assume_token,
             device_id=t.get("device_id"),
             classifier=classifier,
             classifier_name=classifier_name,
@@ -155,6 +181,13 @@ def run_batch(
             result.blocked_unsafe += 1
         else:
             result.human_handoff += 1
+
+        # work the v1 slice can't action, only escalate
+        if record.intent == "unknown":
+            result.unsupported += 1
+        # why tickets didn't auto-resolve (top failure categories)
+        if outcome != "auto_resolved":
+            result.failure_reasons[record.handoff_reason or outcome] += 1
 
         # safety counters (must stay zero)
         if record.route == "auto_action" and record.blast_radius == "high":
@@ -189,6 +222,8 @@ def run_batch(
 
 def _print_summary(result: BatchResult) -> None:
     s = result.summary()
+    if s["source"]:
+        print(f"dataset source            : {s['source']}")
     print(f"tickets processed         : {s['tickets_processed']}")
     print(f"audit records written     : {s['audit_records_written']}")
     print(f"auto-resolved             : {s['auto_resolved']}")
@@ -199,11 +234,16 @@ def _print_summary(result: BatchResult) -> None:
     print(f"safe-block rate           : {s['safe_block_rate']:.3f}")
     print(f"unsafe auto-action        : {s['unsafe_auto_action']}")
     print(f"billing escape            : {s['billing_escape']}")
+    print(f"unsupported rate          : {s['unsupported_rate']:.3f}")
     print(f"classifier category match : {s['category_match_rate']:.3f}")
     print(
         f"manual time saved (est.)  : {s['auto_resolved']} x {MINUTES_PER_TICKET} min"
         f" = {s['manual_minutes_saved']} min  [illustrative]"
     )
+    if s["top_failure_categories"]:
+        print("top failure categories    :")
+        for reason, count in s["top_failure_categories"]:
+            print(f"    {count:>4}  {reason}")
 
 
 def _main() -> None:
@@ -215,6 +255,12 @@ def _main() -> None:
     parser.add_argument("--no-store", action="store_true", help="do not persist audit records")
     parser.add_argument("--db", default=None, help="audit store path (overrides default)")
     parser.add_argument("--export-csv", default=None, help="write per-ticket results CSV")
+    parser.add_argument(
+        "--assume-customer",
+        default=None,
+        help="sandbox customer_id (e.g. cust_alice) to authenticate imported public tickets",
+    )
+    parser.add_argument("--source", default=None, help="dataset label for the report")
     args = parser.parse_args()
 
     store = None
@@ -225,7 +271,13 @@ def _main() -> None:
 
     tickets = load_tickets(args.input)
     print(f"processing {len(tickets)} tickets with classifier={args.classifier}\n")
-    result = run_batch(tickets, classifier_name=args.classifier, store=store)
+    result = run_batch(
+        tickets,
+        classifier_name=args.classifier,
+        store=store,
+        assume_customer=args.assume_customer,
+        source=args.source,
+    )
     _print_summary(result)
 
     if args.export_csv:
