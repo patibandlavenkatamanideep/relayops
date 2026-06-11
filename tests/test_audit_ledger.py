@@ -23,6 +23,7 @@ def _turn(msg, **kw):
 
 class AuditLedgerSchemaTests(unittest.TestCase):
     REQUIRED = {
+        "schema_version",
         "turn_id", "timestamp", "customer_id", "authenticated", "intent",
         "classifier", "confidence", "route", "action_class", "blast_radius",
         "access_gate", "tool_call", "guardrail", "handoff_reason", "evidence",
