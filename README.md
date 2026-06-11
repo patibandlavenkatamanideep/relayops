@@ -1,5 +1,9 @@
 # RelayOps
 
+![Python](https://img.shields.io/badge/python-3.11+-blue)
+![Streamlit](https://img.shields.io/badge/streamlit-app-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
@@ -17,6 +21,9 @@ Handoff Queue, support-ticket batch runner, and Qwen LoRA adapter
 | Route safety | **safe-route 1.000** on the 100-case adversarial suite |
 | Auditability | Per-turn decision trace + SQLite/JSONL/CSV export |
 | Demo | [relayops-production.up.railway.app](https://relayops-production.up.railway.app) |
+
+Most support agents optimize for capability. RelayOps optimizes for **safe,
+auditable, and handoff-ready** outcomes in regulated domains.
 
 [Live Demo](https://relayops-production.up.railway.app) · [MODEL_CARD.md](MODEL_CARD.md) · [Looking for design partners](#looking-for-design-partners)
 
@@ -51,6 +58,20 @@ RelayOps is deployed as an interactive Streamlit demo on Railway:
 The demo exposes the v1 vertical slice: scoped device reset, billing escalation,
 FAQ/RAG answers with citations, guardrail blocking, prompt-injection refusal,
 Decision Console, Handoff Queue, and Batch Run.
+
+## Screens
+
+![Chat tab — authenticated device reset with its decision trace](docs/assets/chat-reset-trace.png)
+*Chat: an authenticated device reset, with the per-turn decision trace.*
+
+![Batch Run tab — 54% auto-resolved on the 50-ticket sample queue](docs/assets/batch-run.png)
+*Batch Run: 54% auto-resolved on the 50-ticket sample queue.*
+
+![Decision Console — zero unsafe actions and zero billing escapes](docs/assets/decision-console.png)
+*Decision Console: route distribution with zero unsafe actions and zero billing escapes.*
+
+![Handoff Queue — owner-routed tickets with reason, evidence, and deadline](docs/assets/handoff-queue.png)
+*Handoff Queue: owner-routed tickets with reason, evidence, and next step.*
 
 ## Looking For Design Partners
 
@@ -206,6 +227,25 @@ claims. Deterministic tests and evals remain the source of truth.
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    A[customer chat turn] --> B["Deterministic access gate<br/>authn → customer scope"]
+    B --> C["Intent classifier<br/>keyword · NB · calibrated NB · Qwen LoRA"]
+    C --> D{Router}
+    D -->|low-risk reversible action| E["Scoped tools<br/>scope enforced server-side"]
+    D -->|FAQ / status| F["Hybrid RAG<br/>cited response"]
+    D -->|billing / account risk| G[Human handoff]
+    E --> H["Independent guardrail<br/>blocks invented offers, PII, unsafe tone"]
+    F --> H
+    H -->|pass| I[Respond]
+    H -->|block| G
+    I --> J[Audit store · Decision Console · export]
+    G --> J
+```
+
+<details>
+<summary>Plain-text version</summary>
+
 ```text
 customer chat turn
       |
@@ -237,6 +277,8 @@ RESPOND or HUMAN HANDOFF
       v
 AUDIT STORE / DECISION CONSOLE / EXPORT
 ```
+
+</details>
 
 The load-bearing design choice: customer data is reached only through scoped tool
 calls, never through prompt text, RAG, or model memory. A model can be wrong, but
