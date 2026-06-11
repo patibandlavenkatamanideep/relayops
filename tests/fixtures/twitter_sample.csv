@@ -1,0 +1,6 @@
+tweet_id,author_id,inbound,created_at,text
+1001,cust_900,True,2026-01-01,@TelcoSupport my internet is down please reset my router
+1002,TelcoSupport,False,2026-01-01,@cust_900 we are sorry to hear that please DM us
+1003,cust_901,True,2026-01-01,I want a refund for this month it was all outages
+1004,cust_902,True,2026-01-01,
+1005,cust_903,True,2026-01-01,how long does a reset take on the gateway

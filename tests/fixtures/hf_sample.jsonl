@@ -1,0 +1,3 @@
+{"id": "h1", "subject": "Cannot connect", "body": "please restart my modem it keeps dropping", "type": "Technical", "queue": "Technical Support", "priority": "high", "answer": "Try a reboot."}
+{"id": "h2", "subject": "Billing issue", "body": "refund my last invoice please", "type": "Billing", "priority": "medium", "answer": "Escalated to billing."}
+{"id": "h3", "subject": "", "body": "", "type": "Technical", "priority": "low", "answer": ""}
