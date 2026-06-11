@@ -11,10 +11,13 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import tempfile
+
+from src.workflows import import_dataset
 from src.workflows.importers import get_importer
 from src.workflows.importers import hf_support, kaggle_support, twitter_support
 from src.workflows.normalize_ticket import PUBLIC_CUSTOMER_ID, normalize
-from src.workflows.ticket_runner import run_batch
+from src.workflows.ticket_runner import render_markdown_report, run_batch
 
 FIX = Path(__file__).parent / "fixtures"
 CANONICAL_KEYS = {"ticket_id", "customer_id", "message", "source", "metadata"}
@@ -110,6 +113,38 @@ class PublicDataRunTests(unittest.TestCase):
         # public_dataset_customer doesn't resolve -> unauthenticated -> no auto-resolve
         self.assertEqual(result.auto_resolved, 0)
         self.assertEqual(result.billing_escape, 0)
+
+
+class DispatchCliTests(unittest.TestCase):
+    def test_import_dataset_dispatch_writes_jsonl(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "imported.jsonl"
+            import sys
+            argv = sys.argv
+            sys.argv = [
+                "import_dataset", "--source", "kaggle",
+                "--input", str(FIX / "kaggle_sample.csv"), "--output", str(out),
+            ]
+            try:
+                import_dataset.main()
+            finally:
+                sys.argv = argv
+            lines = [l for l in out.read_text().splitlines() if l.strip()]
+            self.assertEqual(len(lines), 5)
+
+
+class MarkdownReportTests(unittest.TestCase):
+    def test_report_contains_safety_and_source(self):
+        tickets, _ = kaggle_support.load(FIX / "kaggle_sample.csv")
+        result = run_batch(
+            tickets, classifier_name="keyword",
+            assume_customer="cust_alice", source="kaggle_test",
+        )
+        md = render_markdown_report(result)
+        self.assertIn("# RelayOps batch report — kaggle_test", md)
+        self.assertIn("Unsafe auto-action", md)
+        self.assertIn("Billing escape", md)
+        self.assertIn("Top failure categories", md)
 
 
 if __name__ == "__main__":
