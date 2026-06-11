@@ -18,8 +18,8 @@ class Intent(str, Enum):
 
     RESET_DEVICE = "reset_device"
     DEVICE_STATUS = "device_status"
-    DEVICE_FAQ = "device_faq"    # informational; answered from RAG with citations
-    BILLING = "billing"          # always escalates (touches money)
+    DEVICE_FAQ = "device_faq"  # informational; answered from RAG with citations
+    BILLING = "billing"  # always escalates (touches money)
     GREETING = "greeting"
     UNKNOWN = "unknown"
 
@@ -33,9 +33,9 @@ class Action(str, Enum):
 
 
 class Tier(str, Enum):
-    TIER1 = "tier1"   # cheap/small — easy, confident cases
-    TIER2 = "tier2"   # frontier — hard / low-confidence / action cases
-    NONE = "none"     # no model ran (e.g. straight to escalation)
+    TIER1 = "tier1"  # cheap/small — easy, confident cases
+    TIER2 = "tier2"  # frontier — hard / low-confidence / action cases
+    NONE = "none"  # no model ran (e.g. straight to escalation)
 
 
 class Disposition(str, Enum):
@@ -49,7 +49,7 @@ class Disposition(str, Enum):
 @dataclass(frozen=True)
 class Device:
     device_id: str
-    owner_id: str          # customer_id this device belongs to
+    owner_id: str  # customer_id this device belongs to
     name: str
     online: bool
 
@@ -88,7 +88,7 @@ class RouteDecision:
     tier: Tier
     disposition: Disposition
     tool: Optional[Action] = None
-    retrieve: bool = False        # pull cited facts from RAG before composing
+    retrieve: bool = False  # pull cited facts from RAG before composing
     reason: str = ""
 
 
@@ -109,7 +109,7 @@ class AgentResponse:
     tool_results: list[ToolResult] = field(default_factory=list)
     handoff_context: Optional[dict[str, Any]] = None
     latency_ms: float = 0.0
-    guardrail_action: str = "pass"          # pass | redact | block
+    guardrail_action: str = "pass"  # pass | redact | block
     guardrail_violations: list[str] = field(default_factory=list)
     citations: list[dict[str, Any]] = field(default_factory=list)
 
@@ -120,12 +120,12 @@ class TurnState:
 
     raw_text: str
     auth_token: Optional[str] = None
-    device_id: Optional[str] = None   # target device for a reset, if supplied
+    device_id: Optional[str] = None  # target device for a reset, if supplied
 
-    text: str = ""                    # normalised input
+    text: str = ""  # normalised input
     access: Optional[AccessContext] = None
     classification: Optional[Classification] = None
     route: Optional[RouteDecision] = None
     tool_results: list[ToolResult] = field(default_factory=list)
-    retrieved: list[Any] = field(default_factory=list)   # RetrievedChunk list
+    retrieved: list[Any] = field(default_factory=list)  # RetrievedChunk list
     response: Optional[AgentResponse] = None

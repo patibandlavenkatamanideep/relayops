@@ -67,7 +67,7 @@ COLUMNS: tuple[str, ...] = (
 _CREATE = f"""
 CREATE TABLE IF NOT EXISTS audit_turns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    {', '.join(f'{c} TEXT' for c in COLUMNS)}
+    {", ".join(f"{c} TEXT" for c in COLUMNS)}
 )
 """
 
@@ -138,8 +138,7 @@ class AuditStore:
 
     def _ensure_columns(self) -> None:
         existing = {
-            row["name"]
-            for row in self.conn.execute("PRAGMA table_info(audit_turns)").fetchall()
+            row["name"] for row in self.conn.execute("PRAGMA table_info(audit_turns)").fetchall()
         }
         for column in COLUMNS:
             if column not in existing:
@@ -161,9 +160,7 @@ class AuditStore:
     # --- reads ----------------------------------------------------------------
 
     def all(self) -> list[dict[str, Any]]:
-        cur = self.conn.execute(
-            f"SELECT {', '.join(COLUMNS)} FROM audit_turns ORDER BY id ASC"
-        )
+        cur = self.conn.execute(f"SELECT {', '.join(COLUMNS)} FROM audit_turns ORDER BY id ASC")
         return [dict(r) for r in cur.fetchall()]
 
     def list(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -254,11 +251,15 @@ def _main() -> None:
     parser.add_argument("--limit", type=int, default=20, help="rows for --list")
     parser.add_argument("--stats", action="store_true", help="print aggregate stats")
     parser.add_argument(
-        "--export-jsonl", nargs="?", const=str(_DEFAULT_DIR / "audit_export.jsonl"),
+        "--export-jsonl",
+        nargs="?",
+        const=str(_DEFAULT_DIR / "audit_export.jsonl"),
         help="export all records as JSONL (optional path)",
     )
     parser.add_argument(
-        "--export-csv", nargs="?", const=str(_DEFAULT_DIR / "audit_export.csv"),
+        "--export-csv",
+        nargs="?",
+        const=str(_DEFAULT_DIR / "audit_export.csv"),
         help="export all records as CSV (optional path)",
     )
     args = parser.parse_args()

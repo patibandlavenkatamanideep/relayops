@@ -29,8 +29,12 @@ class NormalizeTests(unittest.TestCase):
 
     def test_canonical_shape(self):
         t = normalize(
-            ticket_id=7, message="reset my router", source="kaggle",
-            category="Technical", priority="High", status="Open",
+            ticket_id=7,
+            message="reset my router",
+            source="kaggle",
+            category="Technical",
+            priority="High",
+            status="Open",
             original_fields={"raw": 1},
         )
         self.assertEqual(set(t.keys()), CANONICAL_KEYS)
@@ -43,7 +47,7 @@ class NormalizeTests(unittest.TestCase):
 class KaggleImporterTests(unittest.TestCase):
     def test_load_maps_and_counts_unmapped(self):
         tickets, unmapped = kaggle_support.load(FIX / "kaggle_sample.csv")
-        self.assertEqual(unmapped, 1)          # the empty subject+description row
+        self.assertEqual(unmapped, 1)  # the empty subject+description row
         self.assertEqual(len(tickets), 5)
         first = tickets[0]
         self.assertEqual(set(first.keys()), CANONICAL_KEYS)
@@ -91,7 +95,7 @@ class PublicDataRunTests(unittest.TestCase):
         tickets, _ = kaggle_support.load(FIX / "kaggle_sample.csv")
         result = run_batch(
             tickets,
-            classifier_name="keyword",          # fast + offline for tests
+            classifier_name="keyword",  # fast + offline for tests
             assume_customer="cust_alice",
             source="kaggle_test",
         )
@@ -120,16 +124,22 @@ class DispatchCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "imported.jsonl"
             import sys
+
             argv = sys.argv
             sys.argv = [
-                "import_dataset", "--source", "kaggle",
-                "--input", str(FIX / "kaggle_sample.csv"), "--output", str(out),
+                "import_dataset",
+                "--source",
+                "kaggle",
+                "--input",
+                str(FIX / "kaggle_sample.csv"),
+                "--output",
+                str(out),
             ]
             try:
                 import_dataset.main()
             finally:
                 sys.argv = argv
-            lines = [l for l in out.read_text().splitlines() if l.strip()]
+            lines = [ln for ln in out.read_text().splitlines() if ln.strip()]
             self.assertEqual(len(lines), 5)
 
 
@@ -137,8 +147,10 @@ class MarkdownReportTests(unittest.TestCase):
     def test_report_contains_safety_and_source(self):
         tickets, _ = kaggle_support.load(FIX / "kaggle_sample.csv")
         result = run_batch(
-            tickets, classifier_name="keyword",
-            assume_customer="cust_alice", source="kaggle_test",
+            tickets,
+            classifier_name="keyword",
+            assume_customer="cust_alice",
+            source="kaggle_test",
         )
         md = render_markdown_report(result)
         self.assertIn("# RelayOps batch report — kaggle_test", md)

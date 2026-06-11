@@ -68,3 +68,5 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Colab-authored training notebooks are scratch artifacts, not product code.
+extend-exclude = ["notebooks"]

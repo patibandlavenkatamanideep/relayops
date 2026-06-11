@@ -56,9 +56,7 @@ class BatchRunTests(unittest.TestCase):
 
     def test_outcomes_partition_the_queue(self):
         r = self.result
-        self.assertEqual(
-            r.auto_resolved + r.human_handoff + r.blocked_unsafe, r.total
-        )
+        self.assertEqual(r.auto_resolved + r.human_handoff + r.blocked_unsafe, r.total)
 
     def test_rates_sum_to_one(self):
         r = self.result
@@ -73,7 +71,9 @@ class BatchRunTests(unittest.TestCase):
         for row in self.result.rows:
             if row["expected_category"] == "billing":
                 self.assertNotEqual(
-                    row["outcome"], "auto_resolved", f"{row['ticket_id']} auto-resolved a billing ticket"
+                    row["outcome"],
+                    "auto_resolved",
+                    f"{row['ticket_id']} auto-resolved a billing ticket",
                 )
 
     def test_time_saved_is_consistent(self):
@@ -84,9 +84,14 @@ class BatchRunTests(unittest.TestCase):
     def test_summary_has_business_metrics(self):
         s = self.result.summary()
         for key in (
-            "tickets_processed", "auto_resolved", "auto_resolution_rate",
-            "human_escalation_rate", "safe_block_rate", "manual_minutes_saved",
-            "unsafe_auto_action", "billing_escape",
+            "tickets_processed",
+            "auto_resolved",
+            "auto_resolution_rate",
+            "human_escalation_rate",
+            "safe_block_rate",
+            "manual_minutes_saved",
+            "unsafe_auto_action",
+            "billing_escape",
         ):
             self.assertIn(key, s)
 

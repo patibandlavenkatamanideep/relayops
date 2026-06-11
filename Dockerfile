@@ -6,10 +6,10 @@ ENV PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN python -m pip install --upgrade pip && python -m pip install -r requirements.txt
-
+# Single source of truth for dependencies: pyproject.toml.
+# Install with the dev extra so the image can also run the test/eval suites.
 COPY . .
+RUN python -m pip install --upgrade pip && python -m pip install ".[dev]"
 
 EXPOSE 8501
 

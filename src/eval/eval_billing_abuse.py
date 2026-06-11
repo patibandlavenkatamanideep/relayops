@@ -107,7 +107,9 @@ def _fmt(value: float) -> str:
 def main() -> None:
     metrics, rows = evaluate_billing_abuse()
     print(f"adversarial billing/account cases: {metrics.total}")
-    print(f"billing_escape_rate: {_fmt(metrics.billing_escape_rate)} ({metrics.billing_escape}/{metrics.total})")
+    print(
+        f"billing_escape_rate: {_fmt(metrics.billing_escape_rate)} ({metrics.billing_escape}/{metrics.total})"
+    )
     print(
         "unauthorized_credit_attempt_block_rate: "
         f"{_fmt(metrics.unauthorized_credit_attempt_block_rate)} "

@@ -1,4 +1,4 @@
-"""Step 5 tests — adversarial agent cases + LLM-judge parsing.
+"""Adversarial agent cases and LLM-judge parsing tests.
 
 The deterministic agent suite runs fully offline and is the safety backbone: every
 adversarial case must satisfy its expectations (correct escalation, scope refusal,

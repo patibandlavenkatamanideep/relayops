@@ -35,8 +35,7 @@ def account_lookup(ctx: AccessContext) -> ToolResult:
             "name": customer.name,
             "plan": customer.plan,
             "devices": [
-                {"device_id": d.device_id, "name": d.name, "online": d.online}
-                for d in devices
+                {"device_id": d.device_id, "name": d.name, "online": d.online} for d in devices
             ],
         },
     )

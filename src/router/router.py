@@ -35,9 +35,7 @@ def route(c: Classification) -> RouteDecision:
 
     if c.intent == Intent.DEVICE_FAQ:
         # Informational: pull cited facts from RAG; no account tool needed.
-        return RouteDecision(
-            Tier.TIER2, Disposition.RESPOND, retrieve=True, reason="faq:rag"
-        )
+        return RouteDecision(Tier.TIER2, Disposition.RESPOND, retrieve=True, reason="faq:rag")
 
     if c.intent == Intent.DEVICE_STATUS:
         return RouteDecision(

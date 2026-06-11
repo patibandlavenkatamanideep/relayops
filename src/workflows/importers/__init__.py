@@ -44,8 +44,12 @@ def cli_main(source: str, load: LoadFn) -> None:
     """Shared `python -m ...` entrypoint for every importer."""
     import argparse
 
-    parser = argparse.ArgumentParser(description=f"Import the {source} dataset into RelayOps tickets")
-    parser.add_argument("--input", required=True, help="downloaded dataset file (.csv/.jsonl/.json)")
+    parser = argparse.ArgumentParser(
+        description=f"Import the {source} dataset into RelayOps tickets"
+    )
+    parser.add_argument(
+        "--input", required=True, help="downloaded dataset file (.csv/.jsonl/.json)"
+    )
     parser.add_argument(
         "--output",
         default="var/imported_public_tickets.jsonl",

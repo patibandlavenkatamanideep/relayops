@@ -1,4 +1,4 @@
-"""Step 3 tests — hybrid RAG with citations.
+"""Hybrid RAG with citations tests.
 
 Covers the retriever in isolation (relevant hit, grounding returns nothing for
 off-topic queries) and the FAQ path end to end (cited answer; escalation when
@@ -64,8 +64,7 @@ class RetrieverTests(unittest.TestCase):
         hits = self.r.search("why does my router keep going offline", k=2)
         self.assertTrue(hits)
         self.assertTrue(
-            any(h.doc_id in {"connectivity-troubleshooting", "outages-and-coverage"}
-                for h in hits)
+            any(h.doc_id in {"connectivity-troubleshooting", "outages-and-coverage"} for h in hits)
         )
 
     def test_off_topic_query_returns_nothing(self):
@@ -115,9 +114,7 @@ class FaqPipelineTests(unittest.TestCase):
         self.assertEqual(r.citations[0]["n"], 1)
 
     def test_unverifiable_faq_escalates(self):
-        r = handle_turn(
-            "how do I set up roaming in Antarctica?", auth_token="tok_alice"
-        )
+        r = handle_turn("how do I set up roaming in Antarctica?", auth_token="tok_alice")
         self.assertEqual(r.intent, Intent.DEVICE_FAQ)
         self.assertTrue(r.escalated)
         self.assertEqual(r.handoff_context["reason"], "unverifiable")

@@ -206,12 +206,15 @@ def _render_queue_tab() -> None:
 
     statuses: dict[str, str] = st.session_state.setdefault("queue_status", {})
     tickets = [
-        m for m in st.session_state.messages
+        m
+        for m in st.session_state.messages
         if (m["response"].handoff_context or {}) and m["response"].escalated
     ]
 
     if not tickets:
-        st.info("No open handoffs — escalate a turn (e.g. the Billing scenario) to populate the queue.")
+        st.info(
+            "No open handoffs — escalate a turn (e.g. the Billing scenario) to populate the queue."
+        )
         return
 
     open_count = sum(1 for m in tickets if statuses.get(m["turn_id"], "open") == "open")
@@ -222,18 +225,23 @@ def _render_queue_tab() -> None:
         turn_id = m["turn_id"]
         status = statuses.get(turn_id, "open")
         badge = "🟢 resolved" if status == "resolved" else "🔴 open"
-        with st.expander(f"{badge}  ·  {h.get('blocked_action', '?')}  ·  {h.get('owner', '?')}", expanded=status == "open"):
-            st.write({
-                "blocked_action": h.get("blocked_action"),
-                "reason_blocked": h.get("reason_blocked"),
-                "owner": h.get("owner"),
-                "evidence_quote": h.get("evidence_quote"),
-                "deadline": h.get("deadline"),
-                "customer_promise": h.get("customer_promise"),
-                "blast_radius": h.get("blast_radius"),
-                "reversible": h.get("reversible"),
-                "status": status,
-            })
+        with st.expander(
+            f"{badge}  ·  {h.get('blocked_action', '?')}  ·  {h.get('owner', '?')}",
+            expanded=status == "open",
+        ):
+            st.write(
+                {
+                    "blocked_action": h.get("blocked_action"),
+                    "reason_blocked": h.get("reason_blocked"),
+                    "owner": h.get("owner"),
+                    "evidence_quote": h.get("evidence_quote"),
+                    "deadline": h.get("deadline"),
+                    "customer_promise": h.get("customer_promise"),
+                    "blast_radius": h.get("blast_radius"),
+                    "reversible": h.get("reversible"),
+                    "status": status,
+                }
+            )
             if status == "open":
                 if st.button("Mark resolved", key=f"resolve_{turn_id}"):
                     statuses[turn_id] = "resolved"
@@ -264,7 +272,9 @@ def _render_batch_tab() -> None:
 
     result = st.session_state.get("batch_result")
     if result is None:
-        st.info(f"Click **Run sample support queue** to process the {_sample_size()} sample tickets.")
+        st.info(
+            f"Click **Run sample support queue** to process the {_sample_size()} sample tickets."
+        )
         return
 
     s = result.summary()
@@ -324,7 +334,7 @@ def main() -> None:
 
     st.session_state.setdefault("messages", [])
     st.session_state.setdefault("auth_label", "Alice (authenticated)")
-    st.session_state.setdefault("classifier_name", "keyword")
+    st.session_state.setdefault("classifier_name", "nb_calibrated")
     st.session_state.setdefault("device_id", "")
 
     with st.sidebar:
@@ -332,10 +342,10 @@ def main() -> None:
         st.selectbox("Customer session", list(AUTH_OPTIONS), key="auth_label")
         st.selectbox(
             "Classifier",
-            ["keyword", "nb", "nb_calibrated"],
+            ["nb_calibrated", "nb", "keyword"],
             index=0,
             key="classifier_name",
-            help="Use nb_calibrated to show v1.2 confidence calibration.",
+            help="Default nb_calibrated (v1.2 confidence calibration); keyword kept for comparison.",
         )
         st.text_input(
             "Explicit device id",

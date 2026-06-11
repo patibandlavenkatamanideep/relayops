@@ -1,4 +1,4 @@
-"""Step 4 tests — dataset, metrics, and the trained classifier beating baseline."""
+"""Dataset, metrics, and trained-classifier-beats-baseline tests."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual({e.intent for e in train}, set(Intent))
         self.assertEqual({e.intent for e in test}, set(Intent))
         # no leakage: disjoint
-        self.assertTrue(set((e.text, e.intent) for e in train).isdisjoint(
-            set((e.text, e.intent) for e in test)
-        ))
+        self.assertTrue(
+            set((e.text, e.intent) for e in train).isdisjoint(set((e.text, e.intent) for e in test))
+        )
 
     def test_stratified_split_keeps_groups_disjoint(self):
         train, test = stratified_split(load_dataset(), test_frac=0.3, seed=13)
@@ -45,16 +45,19 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(cm["b"]["b"], 1)
 
     def test_per_class_precision_recall(self):
-        m = {c.label: c for c in metrics.per_class_metrics(
-            ["a", "a", "b"], ["a", "b", "b"], ["a", "b"])}
-        self.assertEqual(m["a"].recall, 0.5)      # 1 of 2 true-a predicted a
-        self.assertEqual(m["a"].precision, 1.0)   # the one a-pred was correct
+        m = {
+            c.label: c
+            for c in metrics.per_class_metrics(["a", "a", "b"], ["a", "b", "b"], ["a", "b"])
+        }
+        self.assertEqual(m["a"].recall, 0.5)  # 1 of 2 true-a predicted a
+        self.assertEqual(m["a"].precision, 1.0)  # the one a-pred was correct
 
 
 class TrainedClassifierTests(unittest.TestCase):
     def test_returns_classification(self):
-        clf = TrainedClassifier().fit([("reset my router", Intent.RESET_DEVICE),
-                                       ("hi there", Intent.GREETING)])
+        clf = TrainedClassifier().fit(
+            [("reset my router", Intent.RESET_DEVICE), ("hi there", Intent.GREETING)]
+        )
         out = clf.classify("reset my router")
         self.assertIsInstance(out, Classification)
         self.assertEqual(out.intent, Intent.RESET_DEVICE)

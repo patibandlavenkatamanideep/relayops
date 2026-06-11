@@ -1,7 +1,8 @@
-"""Step 1 tests — runnable with either pytest or `python3 -m unittest`.
+"""Access gate, tool scoping, and end-to-end pipeline tests.
 
-Covers the access gate, server-side tool scoping (the security property), the
-baseline classifier, and the end-to-end pipeline dispositions.
+Runnable with either pytest or `python3 -m unittest`. Covers the access gate,
+server-side tool scoping (the security property), the baseline classifier, and
+the end-to-end pipeline dispositions.
 """
 
 from __future__ import annotations
@@ -75,9 +76,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(r.tool_results[-1].ok)
 
     def test_scope_violation_escalates_gracefully(self):
-        r = handle_turn(
-            "reset device dev_b1", auth_token="tok_alice", device_id="dev_b1"
-        )
+        r = handle_turn("reset device dev_b1", auth_token="tok_alice", device_id="dev_b1")
         # Tool refused server-side -> handoff with context, not a crash.
         self.assertFalse(r.tool_results[-1].ok)
         self.assertTrue(r.escalated)

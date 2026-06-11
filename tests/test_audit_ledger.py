@@ -24,11 +24,27 @@ def _turn(msg, **kw):
 class AuditLedgerSchemaTests(unittest.TestCase):
     REQUIRED = {
         "schema_version",
-        "turn_id", "timestamp", "customer_id", "authenticated", "intent",
-        "classifier", "confidence", "route", "action_class", "blast_radius",
-        "access_gate", "tool_call", "guardrail", "handoff_reason", "evidence",
-        "decision_steps", "proposed_action", "blocking_rule", "risk_signal",
-        "available_context", "unavailable_context",
+        "turn_id",
+        "timestamp",
+        "customer_id",
+        "authenticated",
+        "intent",
+        "classifier",
+        "confidence",
+        "route",
+        "action_class",
+        "blast_radius",
+        "access_gate",
+        "tool_call",
+        "guardrail",
+        "handoff_reason",
+        "evidence",
+        "decision_steps",
+        "proposed_action",
+        "blocking_rule",
+        "risk_signal",
+        "available_context",
+        "unavailable_context",
     }
 
     def test_record_has_full_schema(self):
@@ -61,9 +77,10 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertIn("prior_agent_promises", rec["unavailable_context"])
 
         steps = rec["decision_steps"]
-        self.assertEqual([s["stage"] for s in steps], [
-            "access_gate", "classifier", "policy", "tool_permission", "handoff"
-        ])
+        self.assertEqual(
+            [s["stage"] for s in steps],
+            ["access_gate", "classifier", "policy", "tool_permission", "handoff"],
+        )
         self.assertEqual(steps[0]["result"], "allowed")
         self.assertEqual(steps[0]["scope"], "cust_alice")
         self.assertEqual(steps[2]["rule"], "billing_refund_requires_human")

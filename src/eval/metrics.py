@@ -57,9 +57,9 @@ def macro_f1(y_true: list[str], y_pred: list[str], labels: list[str]) -> float:
 
 
 def format_confusion_matrix(cm: dict[str, dict[str, int]], labels: list[str]) -> str:
-    w = max((len(l) for l in labels), default=4)
+    w = max((len(lbl) for lbl in labels), default=4)
     cw = max(w, 4)
-    header = " " * (w + 2) + " ".join(l[:cw].rjust(cw) for l in labels)
+    header = " " * (w + 2) + " ".join(lbl[:cw].rjust(cw) for lbl in labels)
     lines = [header, " " * (w + 2) + "(predicted ->)"]
     for t in labels:
         row = " ".join(str(cm[t][p]).rjust(cw) for p in labels)
@@ -67,11 +67,9 @@ def format_confusion_matrix(cm: dict[str, dict[str, int]], labels: list[str]) ->
     return "\n".join(lines)
 
 
-def classification_report(
-    y_true: list[str], y_pred: list[str], labels: list[str]
-) -> str:
+def classification_report(y_true: list[str], y_pred: list[str], labels: list[str]) -> str:
     rows = per_class_metrics(y_true, y_pred, labels)
-    w = max((len(l) for l in labels), default=8)
+    w = max((len(lbl) for lbl in labels), default=8)
     head = f"{'label'.rjust(w)}  prec   rec    f1     support"
     lines = [head]
     for m in rows:
@@ -79,5 +77,7 @@ def classification_report(
             f"{m.label.rjust(w)}  {m.precision:.2f}  {m.recall:.2f}  {m.f1:.2f}   {m.support}"
         )
     lines.append("")
-    lines.append(f"accuracy: {accuracy(y_true, y_pred):.3f}   macro-F1: {macro_f1(y_true, y_pred, labels):.3f}")
+    lines.append(
+        f"accuracy: {accuracy(y_true, y_pred):.3f}   macro-F1: {macro_f1(y_true, y_pred, labels):.3f}"
+    )
     return "\n".join(lines)

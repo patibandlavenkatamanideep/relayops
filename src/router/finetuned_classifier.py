@@ -73,9 +73,7 @@ def _model_root(path: Path) -> Path:
     return path
 
 
-def _materialize_model_path(
-    model_path: str, tempdirs: list[tempfile.TemporaryDirectory]
-) -> str:
+def _materialize_model_path(model_path: str, tempdirs: list[tempfile.TemporaryDirectory]) -> str:
     """Return a loadable model path, extracting local zip adapters if needed."""
     path = Path(model_path).expanduser()
     if path.is_file() and path.suffix.lower() == ".zip":
@@ -157,7 +155,7 @@ class FineTunedIntentClassifier:
 
                 adapter_config = PeftConfig.from_pretrained(path)
             except Exception as e:
-                if (Path(path).exists() and (Path(path) / "adapter_config.json").exists()):
+                if Path(path).exists() and (Path(path) / "adapter_config.json").exists():
                     raise RuntimeError(f"could not read LoRA adapter config from {path!r}") from e
 
             if adapter_config is not None:

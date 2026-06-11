@@ -25,9 +25,13 @@ SOURCES = ("kaggle", "hf", "twitter")
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Import a public support dataset into RelayOps tickets")
+    parser = argparse.ArgumentParser(
+        description="Import a public support dataset into RelayOps tickets"
+    )
     parser.add_argument("--source", required=True, help=f"dataset source: {', '.join(SOURCES)}")
-    parser.add_argument("--input", required=True, help="downloaded dataset file (.csv/.jsonl/.json)")
+    parser.add_argument(
+        "--input", required=True, help="downloaded dataset file (.csv/.jsonl/.json)"
+    )
     parser.add_argument(
         "--output",
         default="var/imported_public_tickets.jsonl",

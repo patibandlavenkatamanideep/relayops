@@ -1,4 +1,4 @@
-"""Step 2 tests — the independent guardrail layer.
+"""Independent guardrail layer tests.
 
 Runnable with pytest or `python3 -m unittest`. Covers the guardrail in isolation
 (block on hallucinated offers/prices, redact PII, pass clean text) and wired into

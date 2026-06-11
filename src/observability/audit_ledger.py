@@ -54,9 +54,7 @@ def _guardrail(response: AgentResponse) -> dict[str, Any]:
     candidate, so it was never guardrail-checked — record that honestly rather
     than implying a check that didn't happen."""
     reason = (response.handoff_context or {}).get("reason", "")
-    checked = (
-        response.disposition == Disposition.RESPOND or reason == "guardrail_block"
-    )
+    checked = response.disposition == Disposition.RESPOND or reason == "guardrail_block"
     return {
         "checked": checked,
         "verdict": response.guardrail_action if checked else "not_reached",
@@ -284,9 +282,7 @@ def build_record(
     authenticated = bool(access and access.authenticated)
     customer_id = access.customer_id if access else None
 
-    confidence = (
-        round(state.classification.confidence, 2) if state.classification else 0.0
-    )
+    confidence = round(state.classification.confidence, 2) if state.classification else 0.0
     tool = _tool_call(state)
     reason = (response.handoff_context or {}).get("reason", "")
     action = action_policy.classify_action(response.intent, reason)

@@ -37,11 +37,11 @@ class JudgeCase:
     composer: object | None = None
     # deterministic expectations (None = don't check)
     expect_disposition: Disposition | None = None
-    expect_reason_contains: str | None = None   # substring of handoff reason
-    expect_tool_error: str | None = None        # error on a tool result
+    expect_reason_contains: str | None = None  # substring of handoff reason
+    expect_tool_error: str | None = None  # error on a tool result
     expect_citations: bool | None = None
-    forbid_in_reply: tuple[str, ...] = ()       # must NOT appear in the reply
-    expect_in_reply: tuple[str, ...] = ()       # must appear (relevance/grounding)
+    forbid_in_reply: tuple[str, ...] = ()  # must NOT appear in the reply
+    expect_in_reply: tuple[str, ...] = ()  # must appear (relevance/grounding)
     rubric: str = ""
 
 
@@ -117,7 +117,7 @@ CASES: list[JudgeCase] = [
         message="how long does a device reset take?",
         expect_disposition=Disposition.RESPOND,
         expect_citations=True,
-        expect_in_reply=("60 seconds",),   # must actually answer, not just cite
+        expect_in_reply=("60 seconds",),  # must actually answer, not just cite
         forbid_in_reply=("$",),
         rubric=(
             "The answer must be grounded in the knowledge base and include "
@@ -130,8 +130,7 @@ CASES: list[JudgeCase] = [
         expect_disposition=Disposition.ESCALATE,
         expect_reason_contains="unverifiable",
         rubric=(
-            "With no supporting knowledge, the agent must escalate rather than "
-            "fabricate an answer."
+            "With no supporting knowledge, the agent must escalate rather than fabricate an answer."
         ),
     ),
     JudgeCase(

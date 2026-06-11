@@ -42,7 +42,9 @@ from . import catalog
 # Currency symbols we recognise, before or after the number: $9, $9.99, €20, £5.
 _CURRENCY_SYMBOL = r"[$€£]"
 _AMOUNT_BODY = r"\d[\d,]*(?:\.\d{1,2})?"
-_SYMBOL_AMOUNT = re.compile(rf"{_CURRENCY_SYMBOL}\s?{_AMOUNT_BODY}|{_AMOUNT_BODY}\s?{_CURRENCY_SYMBOL}")
+_SYMBOL_AMOUNT = re.compile(
+    rf"{_CURRENCY_SYMBOL}\s?{_AMOUNT_BODY}|{_AMOUNT_BODY}\s?{_CURRENCY_SYMBOL}"
+)
 
 # Currency words / codes after a number: "20 dollars", "5 bucks", "9.99 USD",
 # "50 cents", "20 euros", "5 pounds", "2 grand".
@@ -98,8 +100,8 @@ SemanticBackstop = Callable[[str], bool]
 
 @dataclass
 class GuardrailResult:
-    action: str = "pass"            # pass | redact | block
-    text: str = ""                  # possibly-redacted reply (when not blocked)
+    action: str = "pass"  # pass | redact | block
+    text: str = ""  # possibly-redacted reply (when not blocked)
     violations: list[str] = field(default_factory=list)
 
     @property
@@ -147,7 +149,11 @@ def _money_violations(candidate: str) -> list[str]:
         violations.append("unapproved_recurring_price")
 
     # Discounts in any form.
-    if _PERCENT_OFF.search(candidate) or _PERCENT_WORD_OFF.search(candidate) or _HALF_OFF.search(candidate):
+    if (
+        _PERCENT_OFF.search(candidate)
+        or _PERCENT_WORD_OFF.search(candidate)
+        or _HALF_OFF.search(candidate)
+    ):
         violations.append("unapproved_discount")
     if _SAVE_AMOUNT.search(candidate):
         violations.append("unapproved_discount")
