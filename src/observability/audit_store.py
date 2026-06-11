@@ -37,6 +37,7 @@ DEFAULT_DB_PATH = Path(os.environ.get("RELAYOPS_AUDIT_DB", _DEFAULT_DIR / "relay
 
 # Column order is the canonical export order (JSONL/CSV follow it).
 COLUMNS: tuple[str, ...] = (
+    "schema_version",
     "turn_id",
     "timestamp",
     "customer_id",
@@ -92,6 +93,7 @@ def row_from(record: AuditRecord, response: AgentResponse) -> dict[str, Any]:
     complete, _ = handoff_completeness(handoff)
     evidence_quote = record.evidence[0] if record.evidence else ""
     return {
+        "schema_version": record.schema_version,
         "turn_id": record.turn_id,
         "timestamp": record.timestamp,
         "customer_id": record.customer_id,

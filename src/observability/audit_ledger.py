@@ -22,6 +22,10 @@ from typing import Any, Optional
 from ..core.models import AgentResponse, Disposition, TurnState
 from ..router import action_policy
 
+# Bump when the audit-record shape changes, so exported evidence is
+# self-describing and old rows stay interpretable after the schema evolves.
+SCHEMA_VERSION = "1.0"
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -219,6 +223,7 @@ def _decision_steps(
 class AuditRecord:
     """One row of the decision trail. ``to_dict`` is the canonical wire form."""
 
+    schema_version: str
     turn_id: str
     timestamp: str
     customer_id: Optional[str]
@@ -243,6 +248,7 @@ class AuditRecord:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
             "turn_id": self.turn_id,
             "timestamp": self.timestamp,
             "customer_id": self.customer_id,
@@ -298,6 +304,7 @@ def build_record(
     blocking_rule = rule if route_label == "human_escalation" else None
 
     return AuditRecord(
+        schema_version=SCHEMA_VERSION,
         turn_id=uuid.uuid4().hex[:12],
         timestamp=_utc_now_iso(),
         customer_id=customer_id,
