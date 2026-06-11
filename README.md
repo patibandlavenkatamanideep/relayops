@@ -190,14 +190,17 @@ Validate against a **downloaded public dataset** (import → normalize → run):
 
 ```bash
 # 1. import a downloaded Kaggle / Hugging Face / Twitter support dataset
-python3 -m src.workflows.importers.kaggle_support  --input tickets.csv  --output var/imported_public_tickets.jsonl
-python3 -m src.workflows.importers.hf_support       --input tickets.jsonl --output var/imported_public_tickets.jsonl
-python3 -m src.workflows.importers.twitter_support  --input twcs.csv     --output var/imported_public_tickets.jsonl
+#    (one dispatcher; --source picks the mapper)
+python3 -m src.workflows.import_dataset --source kaggle  --input tickets.csv  --output var/imported_public_tickets.jsonl
+python3 -m src.workflows.import_dataset --source hf      --input tickets.jsonl
+python3 -m src.workflows.import_dataset --source twitter --input twcs.csv
+#    (or call a specific importer directly, e.g. src.workflows.importers.kaggle_support)
 
-# 2. run the same audit/safety/handoff evaluation on it
+# 2. run the same audit/safety/handoff evaluation, and emit a partner report
 python3 -m src.workflows.ticket_runner \
   --input var/imported_public_tickets.jsonl \
-  --classifier nb_calibrated --assume-customer cust_alice --source kaggle
+  --classifier nb_calibrated --assume-customer cust_alice --source kaggle \
+  --report-md var/partner_report.md
 ```
 
 See [Public-dataset validation](#public-dataset-validation) for what this is — and

@@ -27,6 +27,19 @@ LoadResult = tuple[list[dict[str, Any]], int]
 LoadFn = Callable[..., LoadResult]
 
 
+def write_and_report(source: str, tickets: list[dict[str, Any]], unmapped: int, output: str) -> int:
+    """Persist normalized tickets and print a one-line import summary. Shared by
+    the per-dataset CLIs and the unified ``import_dataset`` dispatcher."""
+    n = write_jsonl(tickets, output)
+    total = n + unmapped
+    rate = unmapped / total if total else 0.0
+    print(
+        f"source={source}  imported={n}  unmapped/skipped={unmapped} "
+        f"(unmapped_rate={rate:.3f})  -> {output}"
+    )
+    return n
+
+
 def cli_main(source: str, load: LoadFn) -> None:
     """Shared `python -m ...` entrypoint for every importer."""
     import argparse
@@ -42,13 +55,7 @@ def cli_main(source: str, load: LoadFn) -> None:
     args = parser.parse_args()
 
     tickets, unmapped = load(args.input, limit=args.limit)
-    n = write_jsonl(tickets, args.output)
-    total = n + unmapped
-    rate = unmapped / total if total else 0.0
-    print(
-        f"source={source}  imported={n}  unmapped/skipped={unmapped} "
-        f"(unmapped_rate={rate:.3f})  -> {args.output}"
-    )
+    write_and_report(source, tickets, unmapped, args.output)
 
 
 def get_importer(source: str) -> LoadFn:

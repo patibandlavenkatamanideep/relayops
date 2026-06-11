@@ -246,6 +246,56 @@ def _print_summary(result: BatchResult) -> None:
             print(f"    {count:>4}  {reason}")
 
 
+def render_markdown_report(result: BatchResult) -> str:
+    """Partner-ready markdown summary of a batch run — the deliverable the README
+    promises a design partner (metrics + safety + failure categories)."""
+    s = result.summary()
+    src = s["source"] or "support-ticket batch"
+    lines = [
+        f"# RelayOps batch report — {src}",
+        "",
+        "_Automated run of the RelayOps support agent. Safety counters and handoff "
+        "quality are the load-bearing results; auto-resolution is an illustration of "
+        "capacity, not a domain benchmark._",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Tickets processed | {s['tickets_processed']} |",
+        f"| Audit records written | {s['audit_records_written']} |",
+        f"| Auto-resolution rate | {s['auto_resolution_rate']:.3f} |",
+        f"| Human-escalation rate | {s['human_escalation_rate']:.3f} |",
+        f"| Safe-block rate | {s['safe_block_rate']:.3f} |",
+        f"| Unsupported rate | {s['unsupported_rate']:.3f} |",
+        f"| **Unsafe auto-action** | **{s['unsafe_auto_action']}** |",
+        f"| **Billing escape** | **{s['billing_escape']}** |",
+        f"| Manual time saved (est.) | {s['manual_minutes_saved']} min _(illustrative)_ |",
+        "",
+        "## Outcome breakdown",
+        "",
+        f"- auto-resolved: {result.auto_resolved}",
+        f"- human handoff: {result.human_handoff}",
+        f"- blocked unsafe: {result.blocked_unsafe}",
+        "",
+        "## Top failure categories",
+        "",
+    ]
+    if s["top_failure_categories"]:
+        lines += [f"- {reason} — {count}" for reason, count in s["top_failure_categories"]]
+    else:
+        lines.append("- none (every ticket auto-resolved)")
+    lines += [
+        "",
+        "## What got audited",
+        "",
+        "Every ticket produced a per-turn decision trace (access gate, route, action "
+        "class, blast radius, guardrail verdict, and — when escalated — an "
+        "owner-routed handoff with reason, evidence, and next step). Export the full "
+        "evidence with `--export-csv` or the durable audit store.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _main() -> None:
     import argparse
 
@@ -261,6 +311,7 @@ def _main() -> None:
         help="sandbox customer_id (e.g. cust_alice) to authenticate imported public tickets",
     )
     parser.add_argument("--source", default=None, help="dataset label for the report")
+    parser.add_argument("--report-md", default=None, help="write a partner-ready markdown report")
     args = parser.parse_args()
 
     store = None
@@ -291,6 +342,13 @@ def _main() -> None:
             writer.writeheader()
             writer.writerows(result.rows)
         print(f"\nper-ticket results -> {out}")
+
+    if args.report_md:
+        out = Path(args.report_md)
+        if out.parent and not out.parent.exists():
+            out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(render_markdown_report(result))
+        print(f"partner report -> {out}")
 
     if store is not None:
         store.close()
