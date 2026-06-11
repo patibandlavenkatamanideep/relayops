@@ -72,8 +72,7 @@ class TrainedClassifier:
             comp_total = global_total - sum(class_tokens[c].values())
             denom = comp_total + _ALPHA * v
             raw = {
-                w: math.log((global_tokens[w] - class_tokens[c][w] + _ALPHA) / denom)
-                for w in vocab
+                w: math.log((global_tokens[w] - class_tokens[c][w] + _ALPHA) / denom) for w in vocab
             }
             norm = sum(abs(x) for x in raw.values()) or 1.0
             self._weights[c] = {w: x / norm for w, x in raw.items()}

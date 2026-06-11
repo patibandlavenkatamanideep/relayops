@@ -71,7 +71,7 @@ class AuditStoreTests(unittest.TestCase):
 
     def test_jsonl_export_round_trips(self):
         _populate(self.store)
-        lines = [l for l in self.store.to_jsonl().splitlines() if l.strip()]
+        lines = [ln for ln in self.store.to_jsonl().splitlines() if ln.strip()]
         self.assertEqual(len(lines), len(TURNS))
         parsed = json.loads(lines[0])
         self.assertIn("action_class", parsed)
@@ -97,7 +97,7 @@ class AuditStoreTests(unittest.TestCase):
         out = Path(self.tmp.name) / "export.jsonl"
         n = self.store.export_jsonl(out)
         self.assertEqual(n, len(TURNS))
-        self.assertEqual(len([l for l in out.read_text().splitlines() if l.strip()]), len(TURNS))
+        self.assertEqual(len([ln for ln in out.read_text().splitlines() if ln.strip()]), len(TURNS))
 
     def test_stats_aggregates(self):
         _populate(self.store)
@@ -128,13 +128,17 @@ class AuditStoreTests(unittest.TestCase):
     def test_existing_db_is_migrated_with_trace_columns(self):
         old_db = Path(self.tmp.name) / "old.sqlite3"
         conn = sqlite3.connect(old_db)
-        conn.execute("CREATE TABLE audit_turns (id INTEGER PRIMARY KEY AUTOINCREMENT, turn_id TEXT)")
+        conn.execute(
+            "CREATE TABLE audit_turns (id INTEGER PRIMARY KEY AUTOINCREMENT, turn_id TEXT)"
+        )
         conn.commit()
         conn.close()
 
         migrated = AuditStore(old_db)
         try:
-            columns = {row["name"] for row in migrated.conn.execute("PRAGMA table_info(audit_turns)")}
+            columns = {
+                row["name"] for row in migrated.conn.execute("PRAGMA table_info(audit_turns)")
+            }
             self.assertIn("decision_steps", columns)
             self.assertIn("unavailable_context", columns)
         finally:

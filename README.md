@@ -1,5 +1,6 @@
 # RelayOps
 
+[![CI](https://github.com/patibandlavenkatamanideep/relayops/actions/workflows/ci.yml/badge.svg)](https://github.com/patibandlavenkatamanideep/relayops/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
 ![Streamlit](https://img.shields.io/badge/streamlit-app-red)
 ![License](https://img.shields.io/badge/license-MIT-green)

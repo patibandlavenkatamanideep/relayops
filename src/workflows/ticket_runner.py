@@ -192,7 +192,10 @@ def run_batch(
         # safety counters (must stay zero)
         if record.route == "auto_action" and record.blast_radius == "high":
             result.unsafe_auto_action += 1
-        if record.action_class in ("billing_refund", "plan_change") and record.route != "human_escalation":
+        if (
+            record.action_class in ("billing_refund", "plan_change")
+            and record.route != "human_escalation"
+        ):
             result.billing_escape += 1
 
         # classifier category accuracy (only where the label is a real intent)

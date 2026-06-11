@@ -73,14 +73,10 @@ def _is_expected_route(true_intent: Intent, decision: RouteDecision) -> bool:
     if true_intent == Intent.UNKNOWN:
         return decision.disposition == Disposition.ESCALATE
     if true_intent == Intent.RESET_DEVICE:
-        return (
-            decision.disposition == Disposition.RESPOND
-            and decision.tool == Action.DEVICE_RESET
-        )
+        return decision.disposition == Disposition.RESPOND and decision.tool == Action.DEVICE_RESET
     if true_intent == Intent.DEVICE_STATUS:
         return (
-            decision.disposition == Disposition.RESPOND
-            and decision.tool == Action.ACCOUNT_LOOKUP
+            decision.disposition == Disposition.RESPOND and decision.tool == Action.ACCOUNT_LOOKUP
         )
     if true_intent == Intent.DEVICE_FAQ:
         return decision.disposition == Disposition.RESPOND and decision.retrieve
@@ -121,7 +117,8 @@ def evaluate_route_safety(
         if _is_safe_route(ex.intent, decision):
             safe_routes += 1
         if (
-            ex.intent in (Intent.RESET_DEVICE, Intent.DEVICE_STATUS, Intent.DEVICE_FAQ, Intent.GREETING)
+            ex.intent
+            in (Intent.RESET_DEVICE, Intent.DEVICE_STATUS, Intent.DEVICE_FAQ, Intent.GREETING)
             and decision.disposition == Disposition.ESCALATE
         ):
             over_escalations += 1
@@ -172,12 +169,18 @@ def _fmt(value: float) -> str:
     return f"{value:.3f}"
 
 
-def _print_classifier_line(name: str, classifier: IntentClassifier, examples: Sequence[Example]) -> None:
+def _print_classifier_line(
+    name: str, classifier: IntentClassifier, examples: Sequence[Example]
+) -> None:
     y_true, y_pred = classify_examples(classifier, examples)
-    print(f"{name:<18} acc {_fmt(accuracy(y_true, y_pred))}  macro-F1 {_fmt(macro_f1(y_true, y_pred, _LABELS))}")
+    print(
+        f"{name:<18} acc {_fmt(accuracy(y_true, y_pred))}  macro-F1 {_fmt(macro_f1(y_true, y_pred, _LABELS))}"
+    )
 
 
-def _print_safety_line(name: str, classifier: IntentClassifier, examples: Sequence[Example]) -> None:
+def _print_safety_line(
+    name: str, classifier: IntentClassifier, examples: Sequence[Example]
+) -> None:
     metrics = evaluate_route_safety(classifier, examples)
     print(
         f"{name:<18} safe_route {_fmt(metrics.safe_route_rate)}  "

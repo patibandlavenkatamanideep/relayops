@@ -34,7 +34,7 @@ class ActionClass(str, Enum):
 
     DEVICE_RESET = "device_reset"
     SEND_TROUBLESHOOTING_LINK = "send_troubleshooting_link"
-    ACCOUNT_READ = "account_read"          # read-only status lookup
+    ACCOUNT_READ = "account_read"  # read-only status lookup
     BILLING_REFUND = "billing_refund"
     PLAN_CHANGE = "plan_change"
     ACCOUNT_ACCESS_CHANGE = "account_access_change"
@@ -67,8 +67,8 @@ class ActionPolicy:
     reversibility: Reversibility
     evidence_needed: str
     route: PolicyRoute
-    owner: str           # team that owns the action when a human is needed
-    sla: str             # human-facing next-step / deadline
+    owner: str  # team that owns the action when a human is needed
+    sla: str  # human-facing next-step / deadline
 
 
 # The policy table. Reading top to bottom: only low-blast, reversible actions
@@ -244,9 +244,7 @@ def handoff_completeness(handoff: dict) -> tuple[bool, list[str]]:
     carries a non-empty value — an empty owner is the same as no owner."""
 
     missing = [
-        field
-        for field in REQUIRED_HANDOFF_FIELDS
-        if not str(handoff.get(field, "")).strip()
+        field for field in REQUIRED_HANDOFF_FIELDS if not str(handoff.get(field, "")).strip()
     ]
     return (not missing, missing)
 

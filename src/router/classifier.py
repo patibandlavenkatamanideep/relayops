@@ -16,13 +16,29 @@ from ..core.models import Classification, Intent
 # DEVICE_FAQ uses question phrases so informational queries ("how long does a
 # reset take?") route to RAG instead of triggering the reset action.
 _RULES: list[tuple[Intent, tuple[str, ...]]] = [
-    (Intent.DEVICE_FAQ, (
-        "how do", "how long", "how can", "how often", "why is", "why does",
-        "why do", "what does", "what is", "what should", "steps to", "guide",
-    )),
+    (
+        Intent.DEVICE_FAQ,
+        (
+            "how do",
+            "how long",
+            "how can",
+            "how often",
+            "why is",
+            "why does",
+            "why do",
+            "what does",
+            "what is",
+            "what should",
+            "steps to",
+            "guide",
+        ),
+    ),
     (Intent.RESET_DEVICE, ("reset", "reboot", "restart", "power cycle", "not working", "offline")),
     (Intent.DEVICE_STATUS, ("status", "is my", "online", "connected", "working?")),
-    (Intent.BILLING, ("bill", "charge", "invoice", "refund", "payment", "plan", "upgrade", "price")),
+    (
+        Intent.BILLING,
+        ("bill", "charge", "invoice", "refund", "payment", "plan", "upgrade", "price"),
+    ),
     (Intent.GREETING, ("hi", "hello", "hey", "good morning", "good evening")),
 ]
 

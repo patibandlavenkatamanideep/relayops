@@ -42,8 +42,8 @@ _SYSTEM = (
 
 @dataclass
 class JudgeVerdict:
-    verdict: str        # "pass" | "fail"
-    score: int          # 1-5 (0 if unparsed)
+    verdict: str  # "pass" | "fail"
+    score: int  # 1-5 (0 if unparsed)
     rationale: str
 
 
@@ -122,7 +122,7 @@ class AnthropicJudge:
                         },
                         "required": ["verdict", "score", "rationale"],
                         "additionalProperties": False,
-                    }
+                    },
                 }
             },
         )
@@ -190,7 +190,7 @@ class GeminiJudge:
                 self._last = time.monotonic()
                 last = e
                 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    time.sleep(min(_retry_after(str(e), 2 ** attempt + 1), 60))
+                    time.sleep(min(_retry_after(str(e), 2**attempt + 1), 60))
                     continue
                 raise
         raise last  # type: ignore[misc]

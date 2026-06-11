@@ -31,8 +31,8 @@ _RRF_K = 60
 @dataclass
 class RetrievedChunk:
     chunk: Chunk
-    score: float          # fused RRF score
-    rank: int             # 1-based final rank
+    score: float  # fused RRF score
+    rank: int  # 1-based final rank
 
     # convenience passthroughs for citation building
     @property

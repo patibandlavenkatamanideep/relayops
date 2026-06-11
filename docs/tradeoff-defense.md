@@ -139,7 +139,7 @@ ninety-nine a month"), discount phrasings ("half off", "20 percent off"), and
 bare numbers next to a money cue ("a fee of 15") — while clean operational
 numbers ("reset takes 5 minutes") pass
 ([guardrail.py:_money_violations](../src/guardrails/guardrail.py)). Coverage is
-locked by regression tests in [test_step2.py](../tests/test_step2.py).
+locked by regression tests in [test_guardrail.py](../tests/test_guardrail.py).
 
 **Why this is defensible rather than brittle.** Because the policy is
 "nonzero ⇒ block," I can afford to err toward over-blocking: a false block escalates

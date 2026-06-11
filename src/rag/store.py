@@ -16,11 +16,11 @@ _DEFAULT_KB = Path(__file__).resolve().parents[2] / "knowledge_base"
 
 @dataclass(frozen=True)
 class Chunk:
-    doc_id: str       # source file stem
-    title: str        # article title (first heading)
-    chunk_id: int     # paragraph index within the article
+    doc_id: str  # source file stem
+    title: str  # article title (first heading)
+    chunk_id: int  # paragraph index within the article
     text: str
-    source: str       # human-readable citation source, e.g. "device-reset.md#1"
+    source: str  # human-readable citation source, e.g. "device-reset.md#1"
 
 
 def load_chunks(kb_dir: Path | str | None = None) -> list[Chunk]:

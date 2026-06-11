@@ -51,7 +51,9 @@ class PolicyTableTests(unittest.TestCase):
 
 class ClassifyActionTests(unittest.TestCase):
     def test_reset_intent_maps_to_device_reset(self):
-        self.assertEqual(ap.classify_action(Intent.RESET_DEVICE, "action:reset"), ActionClass.DEVICE_RESET)
+        self.assertEqual(
+            ap.classify_action(Intent.RESET_DEVICE, "action:reset"), ActionClass.DEVICE_RESET
+        )
 
     def test_billing_bucket_is_refund_not_plan(self):
         # router reason is the generic "billing/plan/payment" bucket
@@ -73,9 +75,7 @@ class ClassifyActionTests(unittest.TestCase):
         )
 
     def test_low_confidence_is_unknown(self):
-        self.assertEqual(
-            ap.classify_action(Intent.UNKNOWN, "low_confidence"), ActionClass.UNKNOWN
-        )
+        self.assertEqual(ap.classify_action(Intent.UNKNOWN, "low_confidence"), ActionClass.UNKNOWN)
 
 
 class HandoffBuilderTests(unittest.TestCase):

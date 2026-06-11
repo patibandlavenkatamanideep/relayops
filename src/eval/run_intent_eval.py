@@ -167,9 +167,12 @@ def main() -> None:
         adv = load_dataset(_ADVERSARIAL)
         full = TrainedClassifier().fit([(e.text, e.intent) for e in data])
         kw = BaselineClassifier()
+
         def _line(name: str, clf) -> tuple[list[str], list[str]]:
             y_true, y_pred = _evaluate(clf, adv)
-            print(f"{name} : acc {accuracy(y_true, y_pred):.3f}  macro-F1 {macro_f1(y_true, y_pred, _LABELS):.3f}")
+            print(
+                f"{name} : acc {accuracy(y_true, y_pred):.3f}  macro-F1 {macro_f1(y_true, y_pred, _LABELS):.3f}"
+            )
             return y_true, y_pred
 
         print(f"\n----- adversarial / paraphrase set ({len(adv)} cases) -----")
