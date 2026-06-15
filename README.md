@@ -60,20 +60,6 @@ The demo exposes the v1 vertical slice: scoped device reset, billing escalation,
 FAQ/RAG answers with citations, guardrail blocking, prompt-injection refusal,
 Decision Console, Handoff Queue, and Batch Run.
 
-## Screens
-
-![Chat tab — authenticated device reset with its decision trace](docs/assets/chat-reset-trace.png)
-*Chat: an authenticated device reset, with the per-turn decision trace.*
-
-![Batch Run tab — 54% auto-resolved on the 50-ticket sample queue](docs/assets/batch-run.png)
-*Batch Run: 54% auto-resolved on the 50-ticket sample queue.*
-
-![Decision Console — zero unsafe actions and zero billing escapes](docs/assets/decision-console.png)
-*Decision Console: route distribution with zero unsafe actions and zero billing escapes.*
-
-![Handoff Queue — owner-routed tickets with reason, evidence, and deadline](docs/assets/handoff-queue.png)
-*Handoff Queue: owner-routed tickets with reason, evidence, and next step.*
-
 ## Looking For Design Partners
 
 Want to see this on your own data?
