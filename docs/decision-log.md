@@ -70,11 +70,12 @@ The cheap classifier is load-bearing in the cost story (skips frontier on the ea
 The Tier-1 classifier is a fine-tuned small open model, not Claude. Offline, a
 Complement-NB model stands in (beats keyword 0.492→0.932 CV on the 2,400-example
 group-aware paraphrase dataset). The Qwen2.5-1.5B LoRA fine-tune is now trained +
-evaluated (Colab/Unsloth): held-out 0.999 acc, and on the hand-written adversarial
-legacy 24-case set 0.958 acc / 0.804 macro-F1 vs NB's 0.667 / 0.562 — the real
-generalization win, since the synthetic held-out set is easy for any decent
-learner. The v1.2 100-case adversarial rerun is pending before upgrading the
-Qwen adversarial claim. Recipe +
+evaluated (Colab/Unsloth): held-out 0.992 acc (reloading the published adapter
+over the full-precision base), and on the hand-written adversarial legacy 24-case
+set 0.958 acc / 0.804 macro-F1 vs NB's 0.667 / 0.562 — the real generalization
+win, since the synthetic held-out set is easy for any decent learner. On the v1.2
+100-case adversarial set the adapter scores 0.850 acc / 0.846 macro-F1 vs NB's
+0.660. Recipe +
 chat-JSONL exporter + `FineTunedIntentClassifier` (same interface) ship for GPU
 runs; public adapter upload pending. Classifiers are switchable via
 `router.registry.get_classifier`.

@@ -163,6 +163,6 @@ The project was built fast and with heavy AI assistance — that's true and not
 hidden. The way I'd answer "do you own it" is: **ask me to defend any specific
 tradeoff above and I'll give you the mechanism, the file, and the concession.**
 The docs separate *built* from *designed*, flag the synthetic-data ceiling on the
-0.999 number wherever it appears, and narrate a real gap the LLM judge caught and
+0.992 held-out number wherever it appears, and narrate a real gap the LLM judge caught and
 the fix that followed. Owning the decisions means being able to say where each one
 is *wrong* or *limited* — which is what sections 1–4 each end on.

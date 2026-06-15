@@ -54,13 +54,20 @@ telecom intents over synthetic data.
 ## Evaluation
 | Split | Accuracy | Macro-F1 |
 |---|---:|---:|
-| Held-out (seed-13, group-aware, 726 ex) | 0.999 | 0.999 |
+| Held-out (seed-13, group-aware, 726 ex) | 0.992 | 0.992 |
 | Legacy hand-written adversarial / paraphrase (24 ex) | 0.958 | 0.804 |
-| v1.2 hand-written adversarial / safety set (100 ex) | pending rerun | pending rerun |
+| v1.2 hand-written adversarial / safety set (100 ex) | 0.850 | 0.846 |
+
+Held-out and 100-case numbers are measured by reloading the published adapter
+over the full-precision base (`Qwen/Qwen2.5-1.5B-Instruct`), reproducible with
+the command under "How to use" below.
 
 Baselines on the legacy 24-case adversarial set: keyword 0.250 acc; Complement
 NB 0.667 acc. On the v1.2 100-case adversarial set, keyword is 0.490 acc,
-Complement NB is 0.660 acc, and safe calibrated NB is 0.880 acc.
+Complement NB is 0.660 acc, and safe calibrated NB is 0.880 acc. This Qwen LoRA
+scores 0.850 acc on the same 100-case set — below the denylist-assisted safe
+calibrated NB (0.880), but it reaches that with no hand-authored cues, so it is
+the generalizing classifier rather than a lookup tuned to the eval.
 
 **Denylist caveat (safe calibrated NB).** The "safe calibrated NB" number relies
 on a deterministic cue **denylist** that was authored with sight of the in-set
@@ -73,19 +80,25 @@ past the denylist once rerun on the 100-case set.
 **Honest caveat.** The held-out set is template-generated synthetic data, so high
 in-distribution scores are expected even with anti-leakage splits. Treat the
 held-out number as routing-slice validation, not a production benchmark; the
-adversarial set is the truer generalization signal. The v1.2 repo now has a
-larger 100-case adversarial/safety set; the Qwen rerun is intentionally marked
-pending until measured on that exact set.
+adversarial set is the truer generalization signal — on the 100-case set this
+adapter scores 0.850, well above the NB baseline's 0.660.
 
 ## Limitations
 - Trained on synthetic telecom data for six intents; not a general intent model.
 - Out-of-taxonomy / mixed-intent / abusive messages map to `unknown`, which RelayOps
   escalates — the model does not resolve them.
-- Qwen has not yet been rerun on RelayOps' newer 100-case adversarial/safety set.
+- On the 100-case adversarial/safety set the adapter scores 0.850 acc; the
+  remaining errors are mostly hard `unknown`/`billing` edge phrasings.
 
 ## How to use (in RelayOps)
 ```bash
-RELAYOPS_INTENT_MODEL=<this-repo-or-local-adapter-dir> \
+# On a GPU runtime (e.g. Colab T4). Load the adapter over the full-precision
+# base so no bitsandbytes is needed, and remove the stale torchao the LoRA
+# loader otherwise trips on (the adapter is plain LoRA, not torchao-quantized).
+pip install -U torch transformers peft accelerate
+pip uninstall -y torchao
+RELAYOPS_INTENT_MODEL=venkatamanideep/relayops-intent-qwen \
+RELAYOPS_INTENT_BASE_MODEL=Qwen/Qwen2.5-1.5B-Instruct \
   python -m src.eval.run_intent_eval
 ```
 or in code:

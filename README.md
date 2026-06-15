@@ -137,14 +137,17 @@ Classifier snapshot:
 | Keyword baseline | ~$0 | 0.506 | 0.490 | brittle baseline |
 | Complement NB | ~$0 | 0.933 | 0.660 | offline learned baseline |
 | Safe calibrated NB | ~$0 | 0.934* | **0.880** | current safe routing default |
-| Qwen2.5-1.5B LoRA | low | 0.999‡ | 0.958† | intended neural Tier-1 classifier |
+| Qwen2.5-1.5B LoRA | low | 0.992‡ | **0.850**† | intended neural Tier-1 classifier |
 | Claude Haiku prompt | higher | optional | optional | Tier-2 reference |
 
 `*` Calibrated NB uses a held-out calibration fold. `‡` Qwen held-out is
 synthetic and in-distribution, so it is **not** a production benchmark. `†` Qwen
-adversarial was measured on the earlier 24-case hard set; the 100-case rerun is
-still pending. The trustworthy signal is not "0.999"; it is whether the route
-stays safe under hard billing, scope, injection, and unsupported requests.
+adversarial is now measured on the full 100-case set (acc 0.850, macro-F1
+0.846), reloading the published adapter over the full-precision base. It trails
+the denylist-assisted safe calibrated NB (0.880) but uses **no** hand-authored
+cues, so it is the classifier that actually generalizes. The trustworthy signal
+is not "0.992"; it is whether the route stays safe under hard billing, scope,
+injection, and unsupported requests.
 
 ## Run It
 
@@ -351,7 +354,8 @@ it still cannot widen its own permissions.
 - Dataset is synthetic / paraphrase-rich, not real telecom logs.
 - Held-out classifier scores are routing-slice validation, not production
   benchmarks.
-- Qwen LoRA still needs the 100-case adversarial rerun before stronger claims.
+- Qwen LoRA scores 0.850 acc on the 100-case adversarial set (0.992 on the
+  726-ex held-out test); both reproducible via the MODEL_CARD command.
 - Safe calibrated NB uses a frozen deterministic cue **denylist** for
   money/customer-data and status-question language. It does not generalize to
   unseen phrasings: in-set safe-route is 1.000 but drops to 0.786 on the

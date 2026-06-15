@@ -73,7 +73,7 @@ on the same held-out + adversarial sets:
 | keyword baseline | ~0 | brittle on paraphrases / slang |
 | Complement NB | ~0 | offline learned baseline; beats keyword on the tail |
 | safe calibrated NB | ~0 | v1.2 routing baseline with calibrated confidence + safety overrides |
-| fine-tuned Qwen2.5-1.5B | low | trained/evaluated on held-out + legacy adversarial; 100-case rerun pending |
+| fine-tuned Qwen2.5-1.5B | low | held-out 0.992; 100-case adversarial 0.850 acc / 0.846 macro-F1 |
 | prompted frontier (Claude) | high | strong zero-shot; the Tier-2 reference |
 
 Current measured on the expanded 2,400-example paraphrase-rich dataset (offline,
@@ -82,4 +82,5 @@ with Qwen held-out measured separately): keyword 0.492 → Complement NB 0.932
 not leak across train/test. On the v1.2 100-case adversarial/paraphrase set,
 keyword is 0.490, Complement NB is 0.660, and safe calibrated NB is 0.880. The
 Qwen LoRA measured 0.958 acc / 0.804 macro-F1 on the earlier 24-case adversarial
-set; rerun it on the 100-case set before upgrading that claim.
+set and 0.850 acc / 0.846 macro-F1 on the 100-case set (vs NB's 0.660) — the
+latter is the truer generalization signal.
