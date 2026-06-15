@@ -6,7 +6,12 @@ import unittest
 
 from src.core.models import Action, Classification, Intent
 from src.eval.dataset import Example, load_dataset, stratified_split_3way
-from src.eval.eval_calibration import build_calibrated_nb, evaluate_route_safety
+from src.eval.eval_calibration import (
+    _ADVERSARIAL,
+    _HELDOUT,
+    build_calibrated_nb,
+    evaluate_route_safety,
+)
 from src.router.calibration import fit_calibrated_nb
 from src.router.router import CONFIDENCE_THRESHOLD, route
 
@@ -64,6 +69,27 @@ class CalibrationTests(unittest.TestCase):
         prediction = classifier.classify("is my router down, can you reset it")
 
         self.assertEqual(prediction.intent, Intent.RESET_DEVICE)
+
+
+class HeldOutGeneralizationTests(unittest.TestCase):
+    """Guards the integrity of the frozen-denylist generalization benchmark."""
+
+    def test_heldout_set_exists_and_covers_all_intents(self):
+        heldout = load_dataset(_HELDOUT)
+        self.assertGreaterEqual(len(heldout), 30)
+        self.assertEqual({ex.intent for ex in heldout}, set(Intent))
+
+    def test_heldout_is_disjoint_from_in_set_adversarial(self):
+        in_set = {ex.text.strip().lower() for ex in load_dataset(_ADVERSARIAL)}
+        heldout = {ex.text.strip().lower() for ex in load_dataset(_HELDOUT)}
+        # The cues are frozen against the in-set suite; the held-out slice must
+        # share no cases with it or it stops being a generalization benchmark.
+        self.assertEqual(in_set & heldout, set())
+
+    def test_route_safety_computes_on_heldout(self):
+        classifier = fit_calibrated_nb(load_dataset())
+        metrics = evaluate_route_safety(classifier, load_dataset(_HELDOUT))
+        self.assertEqual(metrics.total, len(load_dataset(_HELDOUT)))
 
 
 class RouteSafetyMetricTests(unittest.TestCase):

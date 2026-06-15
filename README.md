@@ -19,7 +19,7 @@ Handoff Queue, support-ticket batch runner, and Qwen LoRA adapter
 |---|---|
 | Sample queue | **54% auto-resolved** on 50 tickets |
 | Safety counters | **0 unsafe auto-actions**, **0 billing escapes** |
-| Route safety | **safe-route 1.000** on the 100-case adversarial suite |
+| Route safety | in-set safe-route 1.000; **0.786 on a held-out novel-phrasing slice** |
 | Auditability | Per-turn decision trace + SQLite/JSONL/CSV export |
 | Demo | [relayops-production.up.railway.app](https://relayops-production.up.railway.app) |
 
@@ -114,10 +114,21 @@ Example decision trace for a billing request:
 | 50-ticket batch runner | 27 auto-resolved, 20 human handoff, 3 safe-blocked |
 | Batch safety | **0 unsafe auto-actions**, **0 billing escapes**, 50/50 audited |
 | Manual time saved estimate | 27 x 4 min = 108 min, illustrative only |
-| 100-case adversarial routing | safe-route 1.000, route-correct 0.890 |
+| 100-case adversarial routing (in-set) | safe-route 1.000, route-correct 0.890 |
+| 42-case held-out routing (cues frozen) | **safe-route 0.786, route-correct 0.667** |
 | Billing/account abuse suite | billing escape 0.000 across 12 adversarial cases |
 | Agent deterministic checks | 7/7 pass |
 | Gemini LLM judge | 6/7 pass, mean 4.6/5; post-fix rerun pending |
+
+The deterministic route override is a **known-pattern denylist**, not a learned
+generalizer. The in-set 1.000 measures coverage of cues authored with sight of
+`adversarial.jsonl`; the cues are now **frozen** (`src/router/calibration.py`)
+and the honest generalization number is measured on
+`adversarial_heldout.jsonl` — 42 novel-phrasing cases the cues were never tuned
+against. On that slice safe-route is 0.786: a handful of money-touching and
+prompt-injection phrasings with no cue word slip the override (the downstream
+guardrail still vets composed money/PII output). Reproduce both with
+`python3 -m src.eval.eval_calibration`.
 
 Classifier snapshot:
 
@@ -341,8 +352,10 @@ it still cannot widen its own permissions.
 - Held-out classifier scores are routing-slice validation, not production
   benchmarks.
 - Qwen LoRA still needs the 100-case adversarial rerun before stronger claims.
-- Safe calibrated NB uses deterministic cue overrides for money/customer-data and
-  status-question language.
+- Safe calibrated NB uses a frozen deterministic cue **denylist** for
+  money/customer-data and status-question language. It does not generalize to
+  unseen phrasings: in-set safe-route is 1.000 but drops to 0.786 on the
+  held-out novel-phrasing slice.
 - The FAQ composer is extractive; multi-part answers need the deferred Tier-2
   composer.
 - The app runs a local synchronous pipeline, not event-driven production infra.

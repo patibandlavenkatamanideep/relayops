@@ -18,6 +18,17 @@ from ..eval.dataset import Example, stratified_split_3way
 from .classifier import IntentClassifier
 from .trained_classifier import TrainedClassifier
 
+# ---------------------------------------------------------------------------
+# Deterministic high-risk override: a known-pattern denylist.
+#
+# FROZEN as of v1.6 — do NOT edit these lists against held-out adversarial
+# cases. They were historically authored with visibility of the full in-set
+# adversarial suite (src/eval/data/adversarial.jsonl), which is why in-set
+# safe-route reads 1.000. The honest generalization signal is measured on a
+# disjoint, novel-phrasing slice the cues were never tuned against
+# (src/eval/data/adversarial_heldout.jsonl); see README "Route safety". Editing
+# these lists to chase a held-out failure would re-contaminate that benchmark.
+# ---------------------------------------------------------------------------
 _BILLING_CUES = (
     "$",
     " bill",

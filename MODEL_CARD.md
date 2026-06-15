@@ -62,6 +62,14 @@ Baselines on the legacy 24-case adversarial set: keyword 0.250 acc; Complement
 NB 0.667 acc. On the v1.2 100-case adversarial set, keyword is 0.490 acc,
 Complement NB is 0.660 acc, and safe calibrated NB is 0.880 acc.
 
+**Denylist caveat (safe calibrated NB).** The "safe calibrated NB" number relies
+on a deterministic cue **denylist** that was authored with sight of the in-set
+adversarial suite, so its in-set scores (acc 0.880, safe-route 1.000) are
+coverage, not generalization. The cues are frozen and measured on a disjoint
+novel-phrasing slice (`adversarial_heldout.jsonl`), where safe-route is 0.786.
+The Qwen LoRA classifier below is the learned alternative that should generalize
+past the denylist once rerun on the 100-case set.
+
 **Honest caveat.** The held-out set is template-generated synthetic data, so high
 in-distribution scores are expected even with anti-leakage splits. Treat the
 held-out number as routing-slice validation, not a production benchmark; the
