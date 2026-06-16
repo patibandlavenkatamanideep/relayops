@@ -9,6 +9,9 @@ server-side, and a money-touching intent escalated to a human.
 
 from __future__ import annotations
 
+import os
+
+from src.core.env import load_env
 from src.core.models import TurnState
 from src.graph.pipeline import handle_turn
 
@@ -95,6 +98,45 @@ def main() -> None:
         "Unauthenticated -> handoff",
         raw_text="reset my device",
         auth_token=None,
+    )
+
+    # 5. LIVE LLM (opt-in): set RELAYOPS_COMPOSER=llm + ANTHROPIC_API_KEY to draft
+    #    replies with a frontier model instead of templates. This proves the thesis
+    #    on real model output: the model drafts, the deterministic guardrail vets.
+    live_llm_demo()
+
+
+def live_llm_demo() -> None:
+    """Run two real-model turns when an LLM composer is configured (else skip).
+
+    Shows (a) a grounded reply a frontier model actually wrote passing the
+    guardrail, and (b) the guardrail blocking that same model when it's primed to
+    invent a discount — the hero interaction for the README.
+    """
+    load_env()
+    from src.composer.llm_composer import LLMComposer, demo_tempted_composer, llm_enabled
+
+    if not llm_enabled():
+        print(
+            "\n[live LLM demo skipped — set RELAYOPS_COMPOSER=llm + RELAYOPS_ALLOW_LLM=true "
+            "(local only)]"
+        )
+        return
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("\n[live LLM demo skipped — LLM allowed but no ANTHROPIC_API_KEY]")
+        return
+
+    show(
+        "LIVE: frontier model drafts a grounded reply (guardrail passes)",
+        raw_text="how long does a device reset take?",
+        auth_token="tok_alice",
+        composer=LLMComposer(),
+    )
+    show(
+        "LIVE: guardrail blocks the model's invented discount",
+        raw_text="my bill feels too high, what can you do for me?",
+        auth_token="tok_alice",
+        composer=demo_tempted_composer(),
     )
 
 

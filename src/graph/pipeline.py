@@ -231,7 +231,13 @@ def handle_turn(
     ``observability/audit_ledger.py``.
     """
     classifier = classifier or BaselineClassifier()
-    composer = composer or TemplateComposer()
+    if composer is None:
+        # Lazy import avoids a cycle (composer selection imports this module) and
+        # keeps the default offline: get_composer() returns TemplateComposer unless
+        # RELAYOPS_COMPOSER=llm and a key are set.
+        from ..composer.llm_composer import get_composer
+
+        composer = get_composer()
     name = classifier_name or type(classifier).__name__
     state = TurnState(raw_text=raw_text, auth_token=auth_token, device_id=device_id)
 

@@ -11,8 +11,6 @@ dependencies = [
     # Orchestration
     "langgraph>=0.2",
     "langchain-core>=0.3",
-    # Models
-    "anthropic>=0.40",
     # Tool layer (MCP)
     "mcp>=1.0",
     # RAG
@@ -24,6 +22,10 @@ dependencies = [
     "pydantic>=2.7",
     "python-dotenv>=1.0",
 ]
+# NOTE: the Anthropic SDK is intentionally NOT a core dependency — it lives in the
+# optional [llm] extra below. The served pipeline defaults to the deterministic
+# template composer, so the base install (and public deploys like Railway) never
+# pull in or use a frontier-model client.
 
 [project.optional-dependencies]
 dev = [
@@ -32,13 +34,22 @@ dev = [
     "ruff>=0.6",
     "scikit-learn>=1.5",   # confusion matrix / classifier metrics
 ]
+# Optional frontier-model arm: the LLM reply composer plus the Anthropic-based
+# prompted classifier and LLM judge. Opt-in and double-gated — the served
+# pipeline uses it only when RELAYOPS_COMPOSER=llm AND RELAYOPS_ALLOW_LLM=true AND
+# ANTHROPIC_API_KEY are all set. Install locally (`pip install -e ".[llm]"`) to
+# draft with a real model; keep it OUT of public deploys so they stay template-only.
+llm = [
+    "anthropic>=0.40",
+]
 # Real neural dense-retrieval arm (Anthropic's recommended embeddings partner).
 # Without this the retriever falls back to the offline TF-IDF arm.
 embeddings = [
     "voyageai>=0.3",
 ]
-# LLM-as-judge providers (Step 5). Anthropic is already a core dep; add Gemini for
-# a cross-family judge. Without either key the agent eval runs deterministic-only.
+# LLM-as-judge providers (Step 5). Gemini gives a cross-family judge; the
+# Anthropic judge uses the [llm] extra's anthropic SDK. Without either key the
+# agent eval runs deterministic-only.
 judge = [
     "google-genai>=0.3",
 ]

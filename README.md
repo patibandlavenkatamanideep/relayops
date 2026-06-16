@@ -169,6 +169,26 @@ Run the interactive Streamlit app:
 streamlit run src/ui/app.py
 ```
 
+**Optional — draft replies with a real frontier model (local only).** By default
+the composer is a deterministic template (offline, no key). The LLM arm is
+**double-gated** so a public deploy can never spend a key: it runs only when
+`RELAYOPS_COMPOSER=llm` **and** `RELAYOPS_ALLOW_LLM=true` **and** an
+`ANTHROPIC_API_KEY` is set. Put those three in a local `.env` (gitignored), then:
+
+```bash
+set -a && source .env && set +a   # RELAYOPS_COMPOSER=llm, RELAYOPS_ALLOW_LLM=true, ANTHROPIC_API_KEY=...
+python3 demo.py
+```
+
+This adds two live turns: the model drafts a grounded reply (passes), then —
+primed to invent a promotional discount — the guardrail **blocks its made-up
+offer** and escalates. That single interaction is the thesis: the LLM is the
+least-trusted component, and the money guarantee holds without it.
+
+The public demo stays on `RELAYOPS_COMPOSER=template` / `RELAYOPS_ALLOW_LLM=false`
+with no key, so cloners bring their own key and nobody can burn yours. See
+`src/composer/llm_composer.py`.
+
 Run tests and evals:
 
 ```bash
