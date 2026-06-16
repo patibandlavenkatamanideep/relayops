@@ -1,0 +1,407 @@
+# Railway / production runtime constraints — pinned, reproducible build set.
+#
+# Resolved for Python 3.12 (the deploy image) from the CORE dependencies in
+# pyproject.toml only. Intentionally excludes every extra — no [dev], [llm],
+# [embeddings], [judge], or [finetune]. anthropic is absent on purpose: the
+# public image stays template-only.
+#
+# Consumed by the Dockerfile:  pip install -c constraints/railway.txt .
+# Regenerate after changing core deps:
+#   uv pip compile pyproject.toml --python-version 3.12 --no-header -o constraints/railway.txt
+#
+aiohappyeyeballs==2.6.2
+    # via aiohttp
+aiohttp==3.14.1
+    # via kubernetes
+aiosignal==1.4.0
+    # via aiohttp
+altair==6.2.1
+    # via streamlit
+annotated-doc==0.0.4
+    # via typer
+annotated-types==0.7.0
+    # via pydantic
+anyio==4.14.0
+    # via
+    #   httpx
+    #   mcp
+    #   sse-starlette
+    #   starlette
+    #   streamlit
+    #   watchfiles
+attrs==26.1.0
+    # via
+    #   aiohttp
+    #   jsonschema
+    #   referencing
+bcrypt==5.0.0
+    # via chromadb
+blinker==1.9.0
+    # via streamlit
+build==1.5.0
+    # via chromadb
+cachetools==7.1.4
+    # via streamlit
+certifi==2026.5.20
+    # via
+    #   httpcore
+    #   httpx
+    #   kubernetes
+    #   requests
+cffi==2.0.0
+    # via cryptography
+charset-normalizer==3.4.7
+    # via requests
+chromadb==1.5.9
+    # via relayops (pyproject.toml)
+click==8.4.1
+    # via
+    #   streamlit
+    #   uvicorn
+cryptography==49.0.0
+    # via pyjwt
+durationpy==0.10
+    # via kubernetes
+filelock==3.29.4
+    # via huggingface-hub
+flatbuffers==25.12.19
+    # via onnxruntime
+frozenlist==1.8.0
+    # via
+    #   aiohttp
+    #   aiosignal
+fsspec==2026.6.0
+    # via huggingface-hub
+gitdb==4.0.12
+    # via gitpython
+gitpython==3.1.50
+    # via streamlit
+googleapis-common-protos==1.75.0
+    # via opentelemetry-exporter-otlp-proto-grpc
+grpcio==1.81.1
+    # via
+    #   chromadb
+    #   opentelemetry-exporter-otlp-proto-grpc
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
+hf-xet==1.5.1
+    # via huggingface-hub
+httpcore==1.0.9
+    # via httpx
+httptools==0.8.0
+    # via
+    #   streamlit
+    #   uvicorn
+httpx==0.28.1
+    # via
+    #   chromadb
+    #   huggingface-hub
+    #   langgraph-sdk
+    #   langsmith
+    #   mcp
+httpx-sse==0.4.3
+    # via mcp
+huggingface-hub==1.16.1
+    # via tokenizers
+idna==3.18
+    # via
+    #   anyio
+    #   httpx
+    #   requests
+    #   yarl
+importlib-resources==7.1.0
+    # via chromadb
+itsdangerous==2.2.0
+    # via streamlit
+jinja2==3.1.6
+    # via
+    #   altair
+    #   pydeck
+jsonpatch==1.33
+    # via langchain-core
+jsonpointer==3.1.1
+    # via jsonpatch
+jsonschema==4.26.0
+    # via
+    #   altair
+    #   chromadb
+    #   mcp
+jsonschema-specifications==2025.9.1
+    # via jsonschema
+kubernetes==36.0.2
+    # via chromadb
+langchain-core==1.4.7
+    # via
+    #   relayops (pyproject.toml)
+    #   langgraph
+    #   langgraph-checkpoint
+    #   langgraph-prebuilt
+    #   langgraph-sdk
+langchain-protocol==0.0.17
+    # via
+    #   langchain-core
+    #   langgraph-sdk
+langgraph==1.2.5
+    # via relayops (pyproject.toml)
+langgraph-checkpoint==4.1.1
+    # via
+    #   langgraph
+    #   langgraph-prebuilt
+langgraph-prebuilt==1.1.0
+    # via langgraph
+langgraph-sdk==0.4.2
+    # via langgraph
+langsmith==0.8.16
+    # via langchain-core
+markdown-it-py==4.2.0
+    # via rich
+markupsafe==3.0.3
+    # via jinja2
+mcp==1.27.2
+    # via relayops (pyproject.toml)
+mdurl==0.1.2
+    # via markdown-it-py
+mmh3==5.2.1
+    # via chromadb
+multidict==6.7.1
+    # via
+    #   aiohttp
+    #   yarl
+narwhals==2.22.1
+    # via altair
+numpy==2.4.6
+    # via
+    #   chromadb
+    #   onnxruntime
+    #   pandas
+    #   pydeck
+    #   rank-bm25
+    #   streamlit
+oauthlib==3.3.1
+    # via requests-oauthlib
+onnxruntime==1.27.0
+    # via chromadb
+opentelemetry-api==1.42.1
+    # via
+    #   chromadb
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-exporter-otlp-proto-common==1.42.1
+    # via opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-exporter-otlp-proto-grpc==1.42.1
+    # via chromadb
+opentelemetry-proto==1.42.1
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-sdk==1.42.1
+    # via
+    #   chromadb
+    #   opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-semantic-conventions==0.63b1
+    # via opentelemetry-sdk
+orjson==3.11.9
+    # via
+    #   chromadb
+    #   langgraph-sdk
+    #   langsmith
+ormsgpack==1.12.2
+    # via langgraph-checkpoint
+overrides==7.7.0
+    # via chromadb
+packaging==26.2
+    # via
+    #   altair
+    #   build
+    #   huggingface-hub
+    #   langchain-core
+    #   langsmith
+    #   onnxruntime
+    #   streamlit
+pandas==3.0.3
+    # via streamlit
+pillow==12.2.0
+    # via streamlit
+propcache==0.5.2
+    # via
+    #   aiohttp
+    #   yarl
+protobuf==6.33.6
+    # via
+    #   googleapis-common-protos
+    #   onnxruntime
+    #   opentelemetry-proto
+    #   streamlit
+pyarrow==24.0.0
+    # via streamlit
+pybase64==1.4.3
+    # via chromadb
+pycparser==3.0
+    # via cffi
+pydantic==2.13.4
+    # via
+    #   relayops (pyproject.toml)
+    #   chromadb
+    #   langchain-core
+    #   langgraph
+    #   langsmith
+    #   mcp
+    #   pydantic-settings
+pydantic-core==2.46.4
+    # via pydantic
+pydantic-settings==2.14.1
+    # via
+    #   chromadb
+    #   mcp
+pydeck==0.9.2
+    # via streamlit
+pygments==2.20.0
+    # via rich
+pyjwt==2.13.0
+    # via mcp
+pypika==0.51.1
+    # via chromadb
+pyproject-hooks==1.2.0
+    # via build
+python-dateutil==2.9.0.post0
+    # via
+    #   kubernetes
+    #   pandas
+python-dotenv==1.2.2
+    # via
+    #   relayops (pyproject.toml)
+    #   pydantic-settings
+    #   uvicorn
+python-multipart==0.0.32
+    # via
+    #   mcp
+    #   streamlit
+pyyaml==6.0.3
+    # via
+    #   chromadb
+    #   huggingface-hub
+    #   kubernetes
+    #   langchain-core
+    #   uvicorn
+rank-bm25==0.2.2
+    # via relayops (pyproject.toml)
+referencing==0.37.0
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
+requests==2.34.2
+    # via
+    #   kubernetes
+    #   langsmith
+    #   requests-oauthlib
+    #   requests-toolbelt
+    #   streamlit
+requests-oauthlib==2.0.0
+    # via kubernetes
+requests-toolbelt==1.0.0
+    # via langsmith
+rich==15.0.0
+    # via
+    #   chromadb
+    #   typer
+rpds-py==2026.5.1
+    # via
+    #   jsonschema
+    #   referencing
+shellingham==1.5.4
+    # via typer
+six==1.17.0
+    # via
+    #   kubernetes
+    #   python-dateutil
+smmap==5.0.3
+    # via gitdb
+sse-starlette==3.4.4
+    # via mcp
+starlette==1.3.1
+    # via
+    #   mcp
+    #   sse-starlette
+    #   streamlit
+streamlit==1.58.0
+    # via relayops (pyproject.toml)
+tenacity==9.1.4
+    # via
+    #   chromadb
+    #   langchain-core
+    #   streamlit
+tokenizers==0.23.1
+    # via chromadb
+toml==0.10.2
+    # via streamlit
+tqdm==4.68.2
+    # via
+    #   chromadb
+    #   huggingface-hub
+typer==0.26.7
+    # via
+    #   chromadb
+    #   huggingface-hub
+typing-extensions==4.15.0
+    # via
+    #   aiohttp
+    #   aiosignal
+    #   altair
+    #   anyio
+    #   chromadb
+    #   grpcio
+    #   huggingface-hub
+    #   langchain-core
+    #   langchain-protocol
+    #   mcp
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   pydantic
+    #   pydantic-core
+    #   referencing
+    #   starlette
+    #   streamlit
+    #   typing-inspection
+typing-inspection==0.4.2
+    # via
+    #   mcp
+    #   pydantic
+    #   pydantic-settings
+urllib3==2.7.0
+    # via
+    #   kubernetes
+    #   requests
+uuid-utils==0.16.0
+    # via
+    #   langchain-core
+    #   langsmith
+uvicorn==0.49.0
+    # via
+    #   chromadb
+    #   mcp
+    #   streamlit
+uvloop==0.22.1
+    # via uvicorn
+watchfiles==1.2.0
+    # via uvicorn
+websocket-client==1.9.0
+    # via kubernetes
+websockets==15.0.1
+    # via
+    #   langgraph-sdk
+    #   langsmith
+    #   streamlit
+    #   uvicorn
+xxhash==3.7.0
+    # via
+    #   langgraph
+    #   langsmith
+yarl==1.24.2
+    # via aiohttp
+zstandard==0.25.0
+    # via langsmith

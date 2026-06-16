@@ -4,11 +4,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 
-# Public deploy is template-only. The image installs ".[dev]" (NOT ".[llm]", so no
-# anthropic SDK is present), and these defaults keep the reply composer
-# deterministic even if a key were ever injected. The LLM arm is local-only and
-# triple-gated: the [llm] extra + RELAYOPS_COMPOSER=llm + RELAYOPS_ALLOW_LLM=true +
-# ANTHROPIC_API_KEY.
+# Public deploy is template-only. The image installs core deps only (NOT ".[llm]"
+# and NOT ".[dev]", so no anthropic SDK is present), and these defaults keep the
+# reply composer deterministic even if a key were ever injected. The LLM arm is
+# local-only and triple-gated: the [llm] extra + RELAYOPS_COMPOSER=llm +
+# RELAYOPS_ALLOW_LLM=true + ANTHROPIC_API_KEY.
 ENV RELAYOPS_COMPOSER=template
 ENV RELAYOPS_ALLOW_LLM=false
 
@@ -21,10 +21,13 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-# Single source of truth for dependencies: pyproject.toml.
-# Install with the dev extra so the image can also run the test/eval suites.
+# Install CORE deps only, pinned to the reproducible production set so a fresh
+# build can't drift onto a newly-released (and possibly broken) version. The
+# constraints file is generated from pyproject.toml's core dependencies for
+# Python 3.12 (see constraints/railway.txt header to regenerate). No [dev]/[llm].
 COPY . .
-RUN python -m pip install --upgrade pip && python -m pip install ".[dev]"
+RUN python -m pip install --upgrade pip \
+ && python -m pip install -c constraints/railway.txt .
 
 EXPOSE 8501
 
