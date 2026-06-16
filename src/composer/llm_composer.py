@@ -8,7 +8,7 @@ draft through `guardrails.guardrail.check()` before it ships, so an invented
 price or discount the model writes is caught and the turn is escalated. That is
 the property the whole control layer exists to demonstrate.
 
-Selection is explicit, offline-safe, and double-gated so a public deployment
+Selection is explicit, offline-safe, and triple-gated so a public deployment
 cannot spend an API key by accident:
 
   * `RELAYOPS_COMPOSER=llm` **and** `RELAYOPS_ALLOW_LLM=true` **and**
@@ -110,9 +110,10 @@ def _truthy(value: str | None) -> bool:
 def llm_enabled() -> bool:
     """True only when the LLM arm is both selected and explicitly allowed.
 
-    Double-gate so a hosted deploy can't spend a key by accident: `RELAYOPS_ALLOW_LLM`
-    defaults to false, so even `RELAYOPS_COMPOSER=llm` with a stray key stays on the
-    template composer unless the deploy opts in.
+    Checks two of the three gates (`RELAYOPS_COMPOSER=llm` and `RELAYOPS_ALLOW_LLM=true`);
+    `get_composer` enforces the third by also requiring `ANTHROPIC_API_KEY`.
+    `RELAYOPS_ALLOW_LLM` defaults to false, so even `RELAYOPS_COMPOSER=llm` with a stray
+    key stays on the template composer unless the deploy opts in.
     """
     mode = os.environ.get("RELAYOPS_COMPOSER", "template").strip().lower()
     return mode == "llm" and _truthy(os.environ.get("RELAYOPS_ALLOW_LLM"))
