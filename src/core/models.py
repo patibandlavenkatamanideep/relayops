@@ -93,6 +93,52 @@ class RouteDecision:
 
 
 @dataclass(frozen=True)
+class PreActionIntentPacket:
+    """Inspectable model/router proposal before any tool is allowed to run."""
+
+    turn_id: str
+    user_request: str
+    model_interpretation: str
+    requested_action: str
+    target_resource: str
+    policy_handle: str
+    evidence_quote: str
+    confidence: float
+    ambiguity: str = ""
+    proposed_safe_response: str = ""
+
+
+@dataclass(frozen=True)
+class BrokerDecisionPacket:
+    """The deterministic broker's source-of-truth decision for the turn."""
+
+    turn_id: str
+    decision: str  # allow | block | escalate | ask_clarification
+    policy_version: str
+    policy_handle: str
+    matched_rule: str
+    reason_code: str
+    missing_evidence: list[str] = field(default_factory=list)
+    owner: str = ""
+    human_queue: str = ""
+    allowed_next_actions: list[str] = field(default_factory=list)
+    forbidden_next_actions: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class FinalReplyPacket:
+    """Final customer text plus the broker decision it was derived from."""
+
+    turn_id: str
+    source: str
+    broker_decision: str
+    policy_handle: str
+    text: str
+    guardrail_action: str = "not_reached"
+    guardrail_violations: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ToolResult:
     ok: bool
     data: dict[str, Any] = field(default_factory=dict)
@@ -126,6 +172,10 @@ class TurnState:
     access: Optional[AccessContext] = None
     classification: Optional[Classification] = None
     route: Optional[RouteDecision] = None
+    turn_id: str = ""
+    pre_action_intent: Optional[PreActionIntentPacket] = None
+    broker_decision: Optional[BrokerDecisionPacket] = None
+    final_reply: Optional[FinalReplyPacket] = None
     tool_results: list[ToolResult] = field(default_factory=list)
     retrieved: list[Any] = field(default_factory=list)  # RetrievedChunk list
     response: Optional[AgentResponse] = None

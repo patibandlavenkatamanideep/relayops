@@ -76,6 +76,7 @@ class AuditStoreTests(unittest.TestCase):
         parsed = json.loads(lines[0])
         self.assertIn("action_class", parsed)
         self.assertIn("decision_steps", parsed)
+        self.assertIn("broker_decision_packet", parsed)
 
     def test_csv_export_has_header_and_rows(self):
         _populate(self.store)
@@ -83,6 +84,9 @@ class AuditStoreTests(unittest.TestCase):
         self.assertEqual(len(reader), len(TURNS))
         self.assertEqual(set(reader[0].keys()), set(COLUMNS))
         self.assertTrue(json.loads(reader[0]["decision_steps"]))
+        self.assertTrue(json.loads(reader[0]["pre_action_intent_packet"]))
+        self.assertTrue(json.loads(reader[0]["broker_decision_packet"]))
+        self.assertTrue(json.loads(reader[0]["final_reply_packet"]))
 
     def test_trace_fields_are_persisted(self):
         _populate(self.store)
@@ -91,6 +95,10 @@ class AuditStoreTests(unittest.TestCase):
         self.assertEqual(row["blocking_rule"], "billing_refund_requires_human")
         self.assertEqual(row["risk_signal"], "money_touching_request")
         self.assertIn("billing_history", json.loads(row["unavailable_context"]))
+        broker = json.loads(row["broker_decision_packet"])
+        final_reply = json.loads(row["final_reply_packet"])
+        self.assertEqual(broker["decision"], "escalate")
+        self.assertEqual(final_reply["source"], "broker_decision_packet")
 
     def test_export_to_file(self):
         _populate(self.store)
@@ -141,6 +149,9 @@ class AuditStoreTests(unittest.TestCase):
             }
             self.assertIn("decision_steps", columns)
             self.assertIn("unavailable_context", columns)
+            self.assertIn("pre_action_intent_packet", columns)
+            self.assertIn("broker_decision_packet", columns)
+            self.assertIn("final_reply_packet", columns)
         finally:
             migrated.close()
 

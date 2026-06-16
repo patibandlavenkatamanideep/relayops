@@ -1,23 +1,24 @@
-"""Action taxonomy and policy engine.
+"""Action taxonomy used by the policy broker.
 
-The v1 router (``router.py``) decides *disposition* (respond / escalate). This
-module adds the missing layer Reddit reviewers asked for: a declarative
-**action policy** that classifies every supported action by
+The router (``router.py``) proposes disposition/tool/RAG intent. The policy
+broker (``policy_broker.py``) makes the deterministic allow/block/escalate
+decision using this declarative **action policy** table, which classifies every
+supported action by
 
   * blast radius   — how much damage a wrong call does (low / high / unknown)
   * reversibility  — can the action be cleanly undone? (yes / partial / no)
   * evidence_needed — what must be true before we are allowed to act
   * route          — auto_action / respond / escalate
 
-Keeping this as a *table* (not buried ``if/else``) is the point: the router stops
-looking like ad-hoc control flow and starts looking like a policy engine whose
-safety properties can be read off data. The same table also supplies the
+Keeping this as a *table* (not buried ``if/else``) is the point: the broker reads
+like a policy engine whose safety properties can be read off data. The same table
+also supplies the
 **owner team** and **SLA** that make an escalation handoff usable by the next
 human (see ``build_handoff``).
 
-Nothing here changes a routing decision on its own — ``router.py`` remains the
-decision-maker. This module is the *taxonomy and handoff* layer the pipeline and
-the audit ledger read from, so design and execution stay one source of truth.
+Nothing here executes a tool on its own. This module is the *taxonomy and
+handoff* layer the policy broker, pipeline, and audit ledger read from, so design
+and execution stay one source of truth.
 """
 
 from __future__ import annotations

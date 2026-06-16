@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import time
 from typing import Protocol
+from uuid import uuid4
 
 from ..access import gate
 from ..core import data
@@ -34,7 +35,7 @@ from ..mcp import tools
 from ..observability.audit_ledger import AuditLedger
 from ..rag.retriever import HybridRetriever
 from ..rag.store import load_chunks
-from ..router import action_policy, router
+from ..router import action_policy, policy_broker, router
 from ..router.classifier import BaselineClassifier, IntentClassifier
 
 # Number of cited chunks to retrieve for an FAQ answer.
@@ -72,6 +73,16 @@ def classify(state: TurnState, classifier: IntentClassifier) -> TurnState:
 def decide_route(state: TurnState) -> TurnState:
     assert state.classification is not None
     state.route = router.route(state.classification)
+    return state
+
+
+def build_pre_action_packet(state: TurnState) -> TurnState:
+    state.pre_action_intent = policy_broker.build_pre_action_intent_packet(state)
+    return state
+
+
+def broker_decide(state: TurnState) -> TurnState:
+    state.broker_decision = policy_broker.decide_pre_action(state)
     return state
 
 
@@ -168,7 +179,13 @@ class TemplateComposer:
 # --- response builders ---------------------------------------------------------
 
 
-def _escalate(state: TurnState, reason: str, extra: dict | None = None) -> AgentResponse:
+def _escalate(
+    state: TurnState,
+    reason: str,
+    extra: dict | None = None,
+    guardrail_action: str = "not_reached",
+    guardrail_violations: list[str] | None = None,
+) -> AgentResponse:
     assert state.classification is not None and state.route is not None
     # Build a COMPLETE handoff (owner, evidence, customer promise, SLA) so the
     # next human can continue without rereading the chat — safe-but-stranded is
@@ -180,17 +197,23 @@ def _escalate(state: TurnState, reason: str, extra: dict | None = None) -> Agent
         confidence=state.classification.confidence,
         extra=extra,
     )
+    text = policy_broker.compose_escalation_reply(state.broker_decision)
+    state.final_reply = policy_broker.build_final_reply_packet(
+        state,
+        text=text,
+        guardrail_action=guardrail_action,
+        guardrail_violations=guardrail_violations,
+    )
     return AgentResponse(
-        text=(
-            "I'm connecting you with a specialist who can help with this — "
-            "they'll have the full context of our chat."
-        ),
+        text=text,
         intent=state.classification.intent,
         tier=state.route.tier,
         disposition=Disposition.ESCALATE,
         escalated=True,
         tool_results=state.tool_results,
         handoff_context=handoff,
+        guardrail_action=guardrail_action,
+        guardrail_violations=list(guardrail_violations or []),
     )
 
 
@@ -200,6 +223,12 @@ def _respond(state: TurnState, text: str, guard: guardrail.GuardrailResult) -> A
         {"n": i, "title": r.title, "source": r.source, "doc_id": r.doc_id}
         for i, r in enumerate(state.retrieved, 1)
     ]
+    state.final_reply = policy_broker.build_final_reply_packet(
+        state,
+        text=text,
+        guardrail_action=guard.action,
+        guardrail_violations=guard.violations,
+    )
     return AgentResponse(
         text=text,
         intent=state.classification.intent,
@@ -223,12 +252,17 @@ def handle_turn(
     composer: Composer | None = None,
     audit: AuditLedger | None = None,
     classifier_name: str | None = None,
+    turn_id: str | None = None,
 ) -> AgentResponse:
     """Run one customer turn through the full v1 pipeline.
 
     Pass an ``AuditLedger`` to capture the per-turn decision trail (gate, scope,
     route, tool, guardrail, handoff reason, evidence) — see
     ``observability/audit_ledger.py``.
+
+    ``turn_id`` lets a service layer supply a request-scoped id that is then
+    shared by the audit record (and anything that persists it); when omitted the
+    ledger mints its own.
     """
     classifier = classifier or BaselineClassifier()
     if composer is None:
@@ -239,7 +273,12 @@ def handle_turn(
 
         composer = get_composer()
     name = classifier_name or type(classifier).__name__
-    state = TurnState(raw_text=raw_text, auth_token=auth_token, device_id=device_id)
+    state = TurnState(
+        raw_text=raw_text,
+        auth_token=auth_token,
+        device_id=device_id,
+        turn_id=turn_id or uuid4().hex[:12],
+    )
 
     start = time.perf_counter()
 
@@ -247,29 +286,35 @@ def handle_turn(
         response.latency_ms = (time.perf_counter() - start) * 1000
         state.response = response
         if audit is not None:
-            audit.record(state, response, name)
+            audit.record(state, response, name, turn_id=state.turn_id)
         return response
 
     state = ingest(state)
     state = access_gate(state)
     state = classify(state, classifier)
     state = decide_route(state)
+    state = build_pre_action_packet(state)
+    state = broker_decide(state)
 
-    # Unauthenticated callers never reach a model or tool.
-    if state.access is not None and not state.access.authenticated:
-        return finalize(_escalate(state, reason="unauthenticated"))
-    if state.route and state.route.disposition == Disposition.ESCALATE:
-        return finalize(_escalate(state, reason=state.route.reason))
+    # The broker is the source of truth. A non-allow decision never reaches a
+    # tool or raw model-composed reply.
+    if state.broker_decision and state.broker_decision.decision != "allow":
+        reason = state.broker_decision.reason_code
+        if state.route and state.route.disposition == Disposition.ESCALATE and state.route.reason:
+            reason = state.route.reason
+        return finalize(_escalate(state, reason=reason))
 
     state = run_tool(state)
     if state.tool_results and not state.tool_results[-1].ok:
         error = state.tool_results[-1].error or "tool_failed"
+        state.broker_decision = policy_broker.decision_from_tool_error(state, error)
         return finalize(_escalate(state, reason=f"tool_error:{error}"))
 
     if state.route and state.route.retrieve:
         state = retrieve(state)
         # No grounding found -> don't answer from nothing; escalate.
         if not state.retrieved:
+            state.broker_decision = policy_broker.decision_from_unverifiable(state)
             return finalize(_escalate(state, reason="unverifiable"))
 
     candidate = composer.compose(state)
@@ -277,13 +322,16 @@ def handle_turn(
     guard = guardrail.check(candidate)
     if guard.blocked:
         # A hallucinated offer/price (or tone breach) is escalated to a human.
+        state.broker_decision = policy_broker.decision_from_guardrail_block(
+            state, guard.violations
+        )
         response = _escalate(
             state,
             reason="guardrail_block",
             extra={"violations": guard.violations, "blocked_candidate": candidate},
+            guardrail_action="block",
+            guardrail_violations=guard.violations,
         )
-        response.guardrail_action = "block"
-        response.guardrail_violations = guard.violations
         return finalize(response)
 
     return finalize(_respond(state, guard.text, guard))

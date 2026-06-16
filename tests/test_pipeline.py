@@ -89,6 +89,13 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(r.escalated)
         self.assertEqual(r.disposition, Disposition.ESCALATE)
 
+    def test_billing_reply_comes_from_broker_decision(self):
+        r = handle_turn("Can I get 50% off my next bill?", auth_token="tok_alice")
+        self.assertTrue(r.escalated)
+        self.assertEqual(r.disposition, Disposition.ESCALATE)
+        self.assertIn("can't apply or promise", r.text)
+        self.assertNotIn("50%", r.text)
+
     def test_unauthenticated_escalates(self):
         r = handle_turn("reset my device", auth_token=None)
         self.assertTrue(r.escalated)
