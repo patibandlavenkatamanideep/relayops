@@ -15,7 +15,7 @@ re-inference — so the ledger can't drift from what the agent actually did.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -24,7 +24,7 @@ from ..router import action_policy
 
 # Bump when the audit-record shape changes, so exported evidence is
 # self-describing and old rows stay interpretable after the schema evolves.
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 
 def _utc_now_iso() -> str:
@@ -167,6 +167,8 @@ def _decision_steps(
     handoff = response.handoff_context or {}
     confidence = round(state.classification.confidence, 2) if state.classification else 0.0
     allowed = bool(access_gate["allowed"])
+    pre_action = state.pre_action_intent
+    broker = state.broker_decision
     steps: list[dict[str, Any]] = [
         {
             "stage": "access_gate",
@@ -178,12 +180,35 @@ def _decision_steps(
             "intent": response.intent.value,
             "confidence": confidence,
         },
+    ]
+
+    if pre_action is not None:
+        steps.append(
+            {
+                "stage": "pre_action_intent_packet",
+                "requested_action": pre_action.requested_action,
+                "policy_handle": pre_action.policy_handle,
+                "confidence": pre_action.confidence,
+            }
+        )
+
+    if broker is not None:
+        steps.append(
+            {
+                "stage": "policy_broker",
+                "decision": broker.decision,
+                "matched_rule": broker.matched_rule,
+                "reason_code": broker.reason_code,
+            }
+        )
+
+    steps.append(
         {
             "stage": "policy",
             "rule": rule,
             "route": route_label,
         },
-    ]
+    )
 
     tool_allowed = bool(tool and tool.get("ok") and route_label == "auto_action")
     steps.append(
@@ -194,7 +219,7 @@ def _decision_steps(
         }
     )
 
-    if response.guardrail_action != "pass" or response.guardrail_violations:
+    if response.guardrail_action not in ("pass", "not_reached") or response.guardrail_violations:
         steps.append(
             {
                 "stage": "guardrail",
@@ -237,6 +262,9 @@ class AuditRecord:
     guardrail: dict[str, Any]
     handoff_reason: Optional[str]
     evidence: list[str]
+    pre_action_intent_packet: dict[str, Any]
+    broker_decision_packet: dict[str, Any]
+    final_reply_packet: dict[str, Any]
     decision_steps: list[dict[str, Any]]
     proposed_action: str
     blocking_rule: Optional[str]
@@ -262,6 +290,9 @@ class AuditRecord:
             "guardrail": self.guardrail,
             "handoff_reason": self.handoff_reason,
             "evidence": self.evidence,
+            "pre_action_intent_packet": self.pre_action_intent_packet,
+            "broker_decision_packet": self.broker_decision_packet,
+            "final_reply_packet": self.final_reply_packet,
             "decision_steps": self.decision_steps,
             "proposed_action": self.proposed_action,
             "blocking_rule": self.blocking_rule,
@@ -275,8 +306,14 @@ def build_record(
     state: TurnState,
     response: AgentResponse,
     classifier_name: str = "unknown",
+    turn_id: Optional[str] = None,
 ) -> AuditRecord:
-    """Derive the audit record for a completed turn. Pure: reads state, no I/O."""
+    """Derive the audit record for a completed turn. Pure: reads state, no I/O.
+
+    ``turn_id`` lets a caller (e.g. the API layer) supply a request-scoped id so
+    the same id appears in the response, the audit record, and the logs. When
+    omitted a fresh opaque id is generated, preserving the prior behaviour.
+    """
 
     access = state.access
     authenticated = bool(access and access.authenticated)
@@ -298,10 +335,13 @@ def build_record(
         "allowed": authenticated and not scope_blocked,
     }
     blocking_rule = rule if route_label == "human_escalation" else None
+    pre_action_packet = asdict(state.pre_action_intent) if state.pre_action_intent else {}
+    broker_decision_packet = asdict(state.broker_decision) if state.broker_decision else {}
+    final_reply_packet = asdict(state.final_reply) if state.final_reply else {}
 
     return AuditRecord(
         schema_version=SCHEMA_VERSION,
-        turn_id=uuid.uuid4().hex[:12],
+        turn_id=turn_id or uuid.uuid4().hex[:12],
         timestamp=_utc_now_iso(),
         customer_id=customer_id,
         authenticated=authenticated,
@@ -316,6 +356,9 @@ def build_record(
         guardrail=_guardrail(response),
         handoff_reason=reason or None,
         evidence=_evidence(state, response),
+        pre_action_intent_packet=pre_action_packet,
+        broker_decision_packet=broker_decision_packet,
+        final_reply_packet=final_reply_packet,
         decision_steps=_decision_steps(
             state=state,
             response=response,
@@ -345,8 +388,9 @@ class AuditLedger:
         state: TurnState,
         response: AgentResponse,
         classifier_name: str = "unknown",
+        turn_id: Optional[str] = None,
     ) -> AuditRecord:
-        rec = build_record(state, response, classifier_name)
+        rec = build_record(state, response, classifier_name, turn_id=turn_id)
         self.records.append(rec)
         return rec
 

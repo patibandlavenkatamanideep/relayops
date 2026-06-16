@@ -48,6 +48,9 @@ COLUMNS: tuple[str, ...] = (
     "route",
     "action_class",
     "blast_radius",
+    "pre_action_intent_packet",
+    "broker_decision_packet",
+    "final_reply_packet",
     "decision_steps",
     "proposed_action",
     "blocking_rule",
@@ -104,6 +107,9 @@ def row_from(record: AuditRecord, response: AgentResponse) -> dict[str, Any]:
         "route": record.route,
         "action_class": record.action_class,
         "blast_radius": record.blast_radius,
+        "pre_action_intent_packet": _json_summary(record.pre_action_intent_packet),
+        "broker_decision_packet": _json_summary(record.broker_decision_packet),
+        "final_reply_packet": _json_summary(record.final_reply_packet),
         "decision_steps": _json_summary(record.decision_steps),
         "proposed_action": record.proposed_action,
         "blocking_rule": record.blocking_rule or "",
@@ -167,6 +173,25 @@ class AuditStore:
         """Most recent records first (for a live console)."""
         cur = self.conn.execute(
             f"SELECT {', '.join(COLUMNS)} FROM audit_turns ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def get(self, turn_id: str) -> Optional[dict[str, Any]]:
+        """Fetch a single turn's row by its turn_id, or None if absent."""
+        cur = self.conn.execute(
+            f"SELECT {', '.join(COLUMNS)} FROM audit_turns WHERE turn_id = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (turn_id,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def handoffs(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Most recent human-escalation rows — the handoff queue, durably."""
+        cur = self.conn.execute(
+            f"SELECT {', '.join(COLUMNS)} FROM audit_turns "
+            "WHERE route = 'human_escalation' ORDER BY id DESC LIMIT ?",
             (limit,),
         )
         return [dict(r) for r in cur.fetchall()]

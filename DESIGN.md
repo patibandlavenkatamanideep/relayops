@@ -23,12 +23,18 @@ links, toggling settings) but escalates anything that touches billing, plans, or
 payments to a human — and also escalates when it's unsure or when it detects
 distress or abuse. A conversation turn flows through ingest → a deterministic
 access gate (non-LLM) → a tiered model router (cheap first, frontier only when
-needed) → an independent guardrail layer → respond or hand off. Live account
+needed) → a pre-action intent packet → a deterministic policy broker → scoped
+tool/context execution only if allowed → a broker decision packet → final reply
+composition → an independent guardrail layer → respond or hand off. Live account
 data is reached only through scoped tools exposed over an MCP server — never via
 RAG, prompt, or model weights. Knowledge is layered by how often it changes (RAG for
 changing facts, config for small stable rules, fine-tuning only for the intent
 classifier and tone). It is tested with simulations and a calibrated judge, and
 measured by cost per successfully resolved task.
+
+Core invariant: **the model proposes; the broker decides; the tool executes only
+if allowed; the final reply is generated from the broker decision; the human or
+organization remains accountable.**
 
 ## 1. Portfolio scope — what gets built vs. what's designed-only
 This is the most important section. The full design below is sound, but building all
@@ -66,56 +72,68 @@ a vertical slice that proves the load-bearing ideas."*
 - **Deterministic access gate** — a plain (non-LLM) permission check before any model
   runs: the agent only ever sees what the authenticated customer can see. No model
   can widen this.
+- **Pre-action intent packet** — a structured model/router proposal before action:
+  user request, interpreted intent, requested action, target resource, policy handle,
+  evidence quote, confidence, ambiguity, and proposed safe response.
+- **Policy broker / broker decision packet** — the deterministic allow/block/escalate
+  decision: policy version, matched rule, reason code, missing evidence, owner,
+  allowed next actions, and forbidden next actions. This packet is the source of
+  truth for final response generation.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
 
-## 3. The v1 system, drawn once (synchronous, chat-only)
+## 3. The v1.8.1 system, drawn once (synchronous, chat-only)
 ```
-  customer (chat)
-        │
-        ▼
- ┌───────────────────────────────┐
- │ CHANNEL INGEST                │   normalise text
- └───────────────┬───────────────┘
-                 ▼
- ┌───────────────────────────────┐
- │ DETERMINISTIC ACCESS GATE     │   NOT an LLM. authn → resolve permissions =
- │                               │   exactly what this user may see/do.
- └───────────────┬───────────────┘   No model can widen this.
-                 ▼
- ┌───────────────────────────────┐
- │ INTENT CLASSIFIER (Tier 1)    │   fine-tuned small model; cheap, stable
- └───────────────┬───────────────┘
-                 ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │ MODEL ROUTER                                                          │
- │   confident & easy  → Tier 1 small model answers                      │
- │   low conf / hard / action → Tier 2 frontier reasoning model          │
- │                                                                      │
- │   Tier 2 pulls:                                                       │
- │     • Hybrid RAG (BM25 + dense + RRF, cited)  ── changing facts only   │
- │     • MCP CLIENT → MCP SERVER (scoped tools)  ── live account data     │
- │          tools: account_lookup · device_reset · send_link             │
- │          (idempotent, reversible; server enforces per-customer scope)  │
- └─────────────────────────────────┬────────────────────────────────────┘
-                                    ▼   candidate reply
- ┌───────────────────────────────┐
- │ GUARDRAIL LAYER (independent) │   truthfulness · allowed-offers (DATA, not
- │ can block / redact            │   model-invented) · tone · PII redact
- └───────────────┬───────────────┘
-                 │  per-intent threshold? emotion/abuse? action class?
-        ┌────────┴─────────────┐
-        ▼                      ▼
- ┌──────────────┐     ┌──────────────────────┐
- │ RESPOND      │     │ HUMAN HANDOFF        │  billing/plan/payment · low
- │ (chat)       │     │ + full context blob  │  confidence · distress · abuse
- └──────┬───────┘     └──────────┬───────────┘
-        ▼                        ▼
- ┌──────────────────────────────────────────────────────────┐
- │ OBSERVABILITY                                            │
- │ per-turn latency / token / cost · cost-per-resolved-task │
- └──────────────────────────────────────────────────────────┘
+CUSTOMER REQUEST
+      |
+      v
+ACCESS GATE
+authn -> customer scope
+      |
+      v
+MODEL / ROUTER
+intent + confidence; the model proposes, it does not decide
+      |
+      v
+PRE-ACTION INTENT PACKET
+user request, interpreted intent, requested action, resource, policy handle,
+evidence quote, confidence, ambiguity, proposed safe response
+      |
+      v
+POLICY BROKER
+deterministic allow / block / escalate / ask-clarification decision
+      |
+      +---- escalate/block ----> HUMAN HANDOFF
+      |
+      +---- ask clarification -> CLARIFICATION REPLY
+      |
+      +---- allow -----------> SCOPED TOOL / CONTEXT BROKER
+                              tools + RAG; scope enforced server-side
+                                    |
+                                    v
+                              TOOL / CONTEXT RESULT PACKET
+                                    |
+                                    v
+BROKER DECISION PACKET <-----------+
+policy version, matched rule, reason code, missing evidence, owner,
+allowed next actions, forbidden next actions
+      |
+      v
+FINAL REPLY COMPOSER
+generated from the broker decision packet, not raw model proposal
+      |
+      v
+GUARDRAIL LAYER
+truthfulness · allowed offers · tone · PII
+      |
+      +---- fail -------------> HUMAN HANDOFF
+      |
+      +---- pass -------------> CUSTOMER RESPONSE
+      |
+      v
+AUDIT TRAIL / DECISION CONSOLE / EXPORT
+all packets + final response -> human / organization accountability
 ```
 
 Two load-bearing facts (unchanged from the target design):
@@ -123,6 +141,10 @@ Two load-bearing facts (unchanged from the target design):
   before mechanism. Per-customer data only ever enters via a tool call through the
   MCP server — never RAG, prompt, or weights. A prompt-injected agent still cannot
   widen access, because the server, not the model, enforces scope.
+- **The broker is the decision boundary.** The model/router can propose an action,
+  but the broker decides whether it is allowed, blocked, escalated, or clarified.
+  The final reply is generated from the broker decision packet, so an unsafe model
+  proposal cannot leak into the user-facing response after it is blocked.
 - **Tiering is the cost and latency strategy.** The fine-tuned Tier 1 classifier is
   what lets Relay skip the frontier model on the easy majority — so the fine-tune
   earns its place in the cost story rather than being a side quest.

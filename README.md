@@ -8,20 +8,25 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v1.7 working prototype** — live Streamlit demo, Decision Console,
-Handoff Queue, support-ticket batch runner, public-dataset importers, Qwen LoRA
-evals, optional local LLM composer, and pinned Railway deployment. Qwen LoRA
-adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
+Status: **v1.8.1 working prototype** — FastAPI service layer, request-level audit,
+Pre-Action Intent Packets, Broker Decision Packets, live Streamlit demo, Decision
+Console, Handoff Queue, support-ticket batch runner, public-dataset importers,
+Qwen LoRA evals, optional local LLM composer, and pinned Railway deployment.
+Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
 
 > **Core thesis:** RelayOps treats AI support as a control system: scoped
 > permissions, route safety, decision traces, audit export, and human handoff.
+>
+> **Invariant:** the model can propose; the broker decides; the tool executes
+> only if allowed; the final reply is generated from the broker decision; the
+> human or organization remains accountable.
 
 | Signal | Result |
 |---|---|
 | Sample queue | **54% auto-resolved** on 50 tickets |
 | Safety counters | **0 unsafe auto-actions**, **0 billing escapes** |
 | Route safety | in-set safe-route 1.000; **0.786 on a held-out novel-phrasing slice** |
-| Auditability | Per-turn decision trace + SQLite/JSONL/CSV export |
+| Auditability | Pre-action packet + broker decision packet + SQLite/JSONL/CSV export |
 | Demo | [relayops-production.up.railway.app](https://relayops-production.up.railway.app) |
 
 Most support agents optimize for capability. RelayOps optimizes for **safe,
@@ -45,7 +50,8 @@ Example:
 1. Candidate model reply invents a discount.
 2. Guardrail detects unapproved price / discount.
 3. Reply is blocked.
-4. Human handoff is created with evidence.
+4. Human handoff is created from the broker decision packet, not from the unsafe
+   model wording.
 
 The public demo shows this with a canned unsafe candidate (the **Guardrail demo**
 button in the Chat tab) — no API key required. The local demo can run the same
@@ -60,8 +66,11 @@ support system can **safely decide what it is allowed to do**.
 | Control surface | RelayOps behavior | Proof |
 |---|---|---|
 | Access gate | Authenticates first; assigns customer scope before any model step. | Cross-customer reset attempts are refused server-side. |
+| Model proposal | Classifier/router emits a structured Pre-Action Intent Packet. | Action, target resource, policy handle, evidence quote, and confidence are inspectable before action. |
+| Policy broker | Broker converts the proposal into allow/block/escalate. | Broker Decision Packet records matched rule, reason code, missing evidence, and forbidden next actions. |
 | Scoped tools | Device/account operations can only use the current customer's scope. | Prompt injection cannot widen scope. |
 | Route safety | Low-risk reversible actions can run; billing/account-risk requests escalate. | `unsafe_auto_action = 0.000`, `billing_escape = 0.000`. |
+| Final reply | Customer text is generated from the broker decision packet, not raw model proposal. | Blocked discount/price language cannot leak into the handoff reply. |
 | Guardrails | Invented offers, prices, PII, and unsafe tone are blocked after composition. | Hallucinated discounts never reach the user. |
 | Decision traces | Each turn records what happened and what context was unavailable. | Audit rows export to SQLite, JSONL, and CSV. |
 | Human handoff | Escalations carry owner, reason, evidence, next step, and deadline. | Handoff completeness eval passes. |
@@ -116,22 +125,38 @@ found this project, open an issue, or use
 | FAQ/RAG | `how long does a device reset take?` | Cited answer from the local knowledge base. |
 | Unverifiable FAQ | `how do I set up international roaming in Antarctica?` | Escalates because no grounded answer is available. |
 
-Example decision trace for a billing request:
+Example packet trace for a billing request:
 
 ```json
 {
-  "decision_steps": [
-    {"stage": "access_gate", "result": "allowed", "scope": "cust_alice"},
-    {"stage": "classifier", "intent": "billing", "confidence": 0.90},
-    {"stage": "policy", "rule": "billing_refund_requires_human", "route": "human_escalation"},
-    {"stage": "tool_permission", "allowed": false, "reason": "billing action not auto-executable"},
-    {"stage": "handoff", "owner": "billing_support", "deadline": "next available billing specialist"}
-  ],
-  "proposed_action": "refund_review",
-  "blocking_rule": "billing_refund_requires_human",
-  "risk_signal": "money_touching_request",
-  "available_context": ["message", "customer_id", "device_scope"],
-  "unavailable_context": ["billing_history", "payment_method", "prior_agent_promises"]
+  "pre_action_intent_packet": {
+    "user_request": "Can I get 50% off my next bill?",
+    "model_interpretation": "Customer is asking for billing, plan, payment, or discount help",
+    "requested_action": "billing_refund",
+    "target_resource": "customer_billing_account",
+    "policy_handle": "billing.refund.requires_human",
+    "evidence_quote": "Can I get 50% off my next bill?",
+    "confidence": 0.75,
+    "ambiguity": "billing/plan/payment",
+    "proposed_safe_response": "I can connect you with billing support to review available options."
+  },
+  "broker_decision_packet": {
+    "decision": "escalate",
+    "policy_version": "relayops_policy_v1",
+    "policy_handle": "billing.refund.requires_human",
+    "matched_rule": "discounts_refunds_require_human_review",
+    "reason_code": "billing/plan/payment",
+    "missing_evidence": ["active_promo_id", "billing_history", "agent_authorization"],
+    "owner": "billing_support",
+    "human_queue": "billing_review",
+    "allowed_next_actions": ["explain_policy", "route_to_human"],
+    "forbidden_next_actions": ["promise_discount", "apply_discount", "quote_unapproved_price"]
+  },
+  "final_reply_packet": {
+    "source": "broker_decision_packet",
+    "broker_decision": "escalate",
+    "text": "I can't apply or promise billing changes, discounts, credits, or refunds from here..."
+  }
 }
 ```
 
@@ -141,6 +166,7 @@ Example decision trace for a billing request:
 |---|---|
 | 50-ticket batch runner | 27 auto-resolved, 20 human handoff, 3 safe-blocked |
 | Batch safety | **0 unsafe auto-actions**, **0 billing escapes**, 50/50 audited |
+| Packet audit schema | Pre-action intent, broker decision, and final reply packets persisted per turn |
 | Manual time saved estimate | 27 x 4 min = 108 min, illustrative only |
 | 100-case adversarial routing (in-set) | safe-route 1.000, route-correct 0.890 |
 | 42-case held-out routing (cues frozen) | **safe-route 0.786, route-correct 0.667** |
@@ -318,11 +344,15 @@ slice can't action), and the **top failure categories**.
 | Server-side scoped tool bodies | Token/cost dashboards |
 | Keyword, NB, calibrated NB, Qwen LoRA classifiers | Voice |
 | 100-case Qwen adversarial rerun | Event bus |
-| Hybrid RAG with citations | Shadow/canary rollout |
-| Offer/PII/tone guardrail | Hermes-style operator agent |
-| Optional local LLM composer, triple-gated and disabled in public deploy | Production traffic validation |
-| Durable audit store + Decision Console | Cost per resolved ticket |
-| Human Handoff Queue | Design-partner redacted-queue run |
+| FastAPI service boundary + request-level audit | Shadow/canary rollout |
+| Pre-Action Intent Packet | Hermes-style operator agent |
+| Policy Broker + Broker Decision Packet | Production traffic validation |
+| Final Reply Packet generated from broker decision | Cost per resolved ticket |
+| Hybrid RAG with citations | Design-partner redacted-queue run |
+| Offer/PII/tone guardrail | DataStore + real auth store |
+| Optional local LLM composer, triple-gated and disabled in public deploy | JWT auth + rate limiting |
+| Durable audit store + Decision Console | External action envelope |
+| Human Handoff Queue |  |
 | Support-ticket batch runner |  |
 | Public-dataset importers (Kaggle/HF/Twitter) |  |
 | CI-only PR Safety Evidence Gate |  |
@@ -335,18 +365,33 @@ claims. Deterministic tests and evals remain the source of truth.
 
 ```mermaid
 flowchart TD
-    A[customer chat turn] --> B["Deterministic access gate<br/>authn → customer scope"]
-    B --> C["Intent classifier<br/>keyword · NB · calibrated NB · Qwen LoRA"]
-    C --> D{Router}
-    D -->|low-risk reversible action| E["Scoped tools<br/>scope enforced server-side"]
-    D -->|FAQ / status| F["Hybrid RAG<br/>cited response"]
-    D -->|billing / account risk| G[Human handoff]
-    E --> H["Independent guardrail<br/>blocks invented offers, PII, unsafe tone"]
-    F --> H
-    H -->|pass| I[Respond]
-    H -->|block| G
-    I --> J[Audit store · Decision Console · export]
-    G --> J
+    A[Customer request] --> B["Access gate<br/>authn"]
+    B --> C["Customer scope<br/>permissions"]
+    C --> D["Model / router<br/>intent + confidence"]
+    D --> E["Pre-Action Intent Packet<br/>proposal, action, resource, evidence"]
+    E --> F["Policy Broker<br/>deterministic policy"]
+    F --> G{Decision}
+    G -->|allow| H["Scoped Tool / Context Broker<br/>tools + RAG, scope enforced"]
+    G -->|ask clarification| I[Clarification reply]
+    G -->|escalate| J[Human handoff]
+    G -->|block| J
+    H --> K["Tool / Context Result Packet"]
+    K --> L["Broker Decision Packet<br/>source of truth"]
+    I --> L
+    F -->|no tool needed| L
+    L --> M["Final Reply Composer<br/>from broker decision"]
+    M --> N["Guardrail<br/>offers, PII, tone"]
+    N -->|pass| O[Customer response]
+    N -->|fail| J
+    E --> P["Audit trail<br/>all packets + final response"]
+    F --> P
+    H --> P
+    K --> P
+    L --> P
+    N --> P
+    O --> P
+    J --> P
+    P --> Q["Human / organization accountability"]
 ```
 
 <details>
@@ -356,39 +401,52 @@ flowchart TD
 customer chat turn
       |
       v
-DETERMINISTIC ACCESS GATE
-authn -> customer scope
+ACCESS GATE
+authn
       |
       v
-INTENT CLASSIFIER
-keyword / NB / calibrated NB / Qwen LoRA
+CUSTOMER SCOPE
+permissions and allowed resources
       |
       v
-ROUTER
-low-risk action -> scoped tool
-FAQ/status      -> RAG/cited response
-billing/risk    -> human handoff
+MODEL / ROUTER
+intent + confidence
       |
       v
-SCOPED TOOLS + HYBRID RAG
-tool scope enforced server-side
+PRE-ACTION INTENT PACKET
+proposal, requested action, resource, policy handle, evidence
       |
       v
-INDEPENDENT GUARDRAIL
-blocks invented offers, PII, unsafe tone
+POLICY BROKER
+allow / block / escalate / ask clarification
       |
       v
-RESPOND or HUMAN HANDOFF
+SCOPED TOOL OR CONTEXT BROKER
+executes only if allowed; returns tool/context result packet
       |
       v
-AUDIT STORE / DECISION CONSOLE / EXPORT
+BROKER DECISION PACKET
+source of truth for the final reply
+      |
+      v
+FINAL REPLY COMPOSER
+generated from the broker decision, not raw model proposal
+      |
+      v
+GUARDRAIL
+pass -> customer response; fail -> human handoff
+      |
+      v
+AUDIT TRAIL -> HUMAN / ORGANIZATION ACCOUNTABILITY
 ```
 
 </details>
 
 The load-bearing design choice: customer data is reached only through scoped tool
 calls, never through prompt text, RAG, or model memory. A model can be wrong, but
-it still cannot widen its own permissions.
+it still cannot widen its own permissions. A model can propose an unsafe action,
+but the broker packet decides what can execute and what the final customer reply
+is allowed to say.
 
 ## Roadmap
 
@@ -403,10 +461,13 @@ it still cannot widen its own permissions.
 | v1.5.1 | decision trace + billing/account abuse eval | shipped |
 | v1.6 | public-dataset importer + external-data validation | shipped |
 | v1.7 | optional LLM composer + public safety gate | shipped |
-| v1.8 | FastAPI service layer + request-level audit | next |
-| v1.9 | cost per resolved ticket | planned |
-| v2.0 | real MCP transport boundary | planned |
-| v2.1 | design-partner redacted-queue run | planned |
+| v1.8 | FastAPI service layer + request-level audit | shipped |
+| v1.8.1 | Pre-Action Intent Packet + Broker Decision Packet | shipped |
+| v1.9 | policy registry / policy handles | planned |
+| v2.0 | datastore + SQLite customer/auth store | planned |
+| v2.1 | JWT auth + rate limiting | planned |
+| v2.2 | external action envelope | planned |
+| v2.3 | real MCP/tool-server boundary | planned |
 
 ## Limitations
 
@@ -429,8 +490,9 @@ it still cannot widen its own permissions.
 
 ```text
 src/access/         deterministic access gate
+src/api/            FastAPI service boundary + request-level audit
 src/mcp/            scoped tool bodies
-src/router/         tiered router + intent classifiers
+src/router/         tiered router, policy broker, intent classifiers
 src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline

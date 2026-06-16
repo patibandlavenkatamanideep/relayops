@@ -4,6 +4,19 @@ Append-only record of decisions. Newest at top. Each entry: ID, date, decision, 
 
 ## Portfolio-scope deltas (P-series)
 
+### P9 — Separate model proposal from broker decision
+**Date:** June 2026
+v1.8.1 adds `PreActionIntentPacket`, `BrokerDecisionPacket`, and
+`FinalReplyPacket`. The model/router can propose an action, but the deterministic
+policy broker decides whether to allow, block, escalate, or ask for clarification.
+Scoped tools execute only after an allow decision, and the final customer reply is
+recorded as generated from the broker decision packet rather than raw model output.
+**Why:** This closes a subtle safety gap: a model might propose an unsafe discount
+or account action, the system might block it, but a final reply could still hint
+that the unsafe action is possible. Broker-derived replies make the source of
+truth explicit and make audits show who proposed, who decided, who executed, who
+audited, and who remains accountable.
+
 ### P8 — Add decision trace and billing/account abuse eval
 **Date:** June 2026
 v1.5.1 adds structured `decision_steps`, `proposed_action`, `blocking_rule`,

@@ -39,6 +39,9 @@ class AuditLedgerSchemaTests(unittest.TestCase):
         "guardrail",
         "handoff_reason",
         "evidence",
+        "pre_action_intent_packet",
+        "broker_decision_packet",
+        "final_reply_packet",
         "decision_steps",
         "proposed_action",
         "blocking_rule",
@@ -53,6 +56,10 @@ class AuditLedgerSchemaTests(unittest.TestCase):
         self.assertEqual(rec["classifier"], "nb_calibrated")
         self.assertTrue(rec["turn_id"])
         self.assertTrue(rec["timestamp"].endswith("+00:00"))
+        self.assertEqual(rec["pre_action_intent_packet"]["turn_id"], rec["turn_id"])
+        self.assertEqual(rec["broker_decision_packet"]["turn_id"], rec["turn_id"])
+        self.assertEqual(rec["final_reply_packet"]["turn_id"], rec["turn_id"])
+        self.assertEqual(rec["final_reply_packet"]["source"], "broker_decision_packet")
 
 
 class AuditLedgerBehaviourTests(unittest.TestCase):
@@ -75,18 +82,43 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertIn("billing_history", rec["unavailable_context"])
         self.assertIn("payment_method", rec["unavailable_context"])
         self.assertIn("prior_agent_promises", rec["unavailable_context"])
+        self.assertEqual(
+            rec["pre_action_intent_packet"]["requested_action"], "billing_refund"
+        )
+        self.assertEqual(
+            rec["pre_action_intent_packet"]["policy_handle"],
+            "billing.refund.requires_human",
+        )
+        self.assertEqual(rec["broker_decision_packet"]["decision"], "escalate")
+        self.assertIn(
+            "promise_discount", rec["broker_decision_packet"]["forbidden_next_actions"]
+        )
+        self.assertEqual(
+            rec["final_reply_packet"]["policy_handle"],
+            rec["broker_decision_packet"]["policy_handle"],
+        )
 
         steps = rec["decision_steps"]
         self.assertEqual(
             [s["stage"] for s in steps],
-            ["access_gate", "classifier", "policy", "tool_permission", "handoff"],
+            [
+                "access_gate",
+                "classifier",
+                "pre_action_intent_packet",
+                "policy_broker",
+                "policy",
+                "tool_permission",
+                "handoff",
+            ],
         )
         self.assertEqual(steps[0]["result"], "allowed")
         self.assertEqual(steps[0]["scope"], "cust_alice")
-        self.assertEqual(steps[2]["rule"], "billing_refund_requires_human")
-        self.assertFalse(steps[3]["allowed"])
-        self.assertEqual(steps[3]["reason"], "billing action not auto-executable")
-        self.assertEqual(steps[4]["owner"], "billing_support")
+        self.assertEqual(steps[2]["policy_handle"], "billing.refund.requires_human")
+        self.assertEqual(steps[3]["decision"], "escalate")
+        self.assertEqual(steps[4]["rule"], "billing_refund_requires_human")
+        self.assertFalse(steps[5]["allowed"])
+        self.assertEqual(steps[5]["reason"], "billing action not auto-executable")
+        self.assertEqual(steps[6]["owner"], "billing_support")
 
     def test_reset_turn_records_tool_call_and_auto_action(self):
         rec = _turn("my router isn't working, can you reset it?", auth_token="tok_alice")
@@ -136,6 +168,11 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertTrue(rec["guardrail"]["checked"])
         self.assertEqual(rec["guardrail"]["verdict"], "block")
         self.assertTrue(rec["guardrail"]["violations"])
+        self.assertEqual(rec["broker_decision_packet"]["decision"], "block")
+        self.assertEqual(
+            rec["broker_decision_packet"]["matched_rule"], "final_reply_guardrail_failed"
+        )
+        self.assertEqual(rec["final_reply_packet"]["guardrail_action"], "block")
 
 
 class LedgerAccumulationTests(unittest.TestCase):
