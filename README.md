@@ -35,6 +35,23 @@ auditable, and handoff-ready** outcomes in regulated domains.
 > mirrors production controls: access gate, scoped tools, guardrails, audit trail,
 > and handoff.
 
+## Guardrail Hero Demo
+
+RelayOps can let a model draft a response, but the model is not trusted to decide
+what reaches the user.
+
+Example:
+
+1. Candidate model reply invents a discount.
+2. Guardrail detects unapproved price / discount.
+3. Reply is blocked.
+4. Human handoff is created with evidence.
+
+The public demo shows this with a canned unsafe candidate (the **Guardrail demo**
+button in the Chat tab) — no API key required. The local demo can run the same
+pattern with a real LLM when `RELAYOPS_COMPOSER=llm`, `RELAYOPS_ALLOW_LLM=true`,
+and `ANTHROPIC_API_KEY` are set.
+
 ## Why It Matters
 
 Most AI-agent demos show whether a model can answer. RelayOps asks whether a
