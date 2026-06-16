@@ -5,7 +5,8 @@ ships. It can **block** (force a human handoff) or **redact**. v1 rules:
 
   1. Truthfulness / allowed-offers  -> BLOCK. Any price/discount/paid-offer claim
      not backed by the approved catalog (DATA) is treated as a hallucination.
-  2. PII leakage                    -> REDACT. Card numbers / SSNs never go out.
+  2. PII leakage                    -> REDACT. Card numbers, SSNs, phone numbers,
+     emails, and simple street addresses never go out.
   3. Tone                           -> BLOCK. A minimal abusive-language screen.
 
 On (1) the policy is asymmetric and deliberate: the catalog only approves *free*
@@ -23,7 +24,8 @@ to catch novel phrasings the patterns miss. It is off by default so the pipeline
 and tests stay deterministic and offline.
 
 Deferred (designed, not built): citation-grounded fact verification against RAG,
-brand-voice scoring, a larger PII taxonomy. The interface stays the same.
+brand-voice scoring, a fuller PII taxonomy (names, IBANs, locale formats). The
+interface stays the same.
 """
 
 from __future__ import annotations
@@ -88,9 +90,26 @@ _MONEY_CUE = r"(?:cost|costs|charge|charged|charges|fee|fees|pay|price|priced|pr
 _CUE_THEN_NUM = re.compile(rf"\b{_MONEY_CUE}\b[^.\d]{{0,12}}({_AMOUNT_BODY})", re.IGNORECASE)
 _NUM_THEN_CUE = re.compile(rf"({_AMOUNT_BODY})\s+(?:a|per)?\s*{_MONEY_CUE}\b", re.IGNORECASE)
 
-# PII to redact from outbound text.
+# PII to redact from outbound text. The taxonomy is deliberately small but covers
+# the common identifiers a drafted reply might echo back: card, SSN, phone, email,
+# and a simple US street address. The goal is honest coverage of obvious cases,
+# not exhaustive PII detection.
 _CARD = re.compile(r"\b(?:\d[ -]?){13,16}\b")
 _SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+# Phone: 203-555-0199, (203) 555-0199, 203.555.0199, 203 555 0199.
+_PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b")
+# Email: a pragmatic address shape, not the full RFC grammar.
+_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Simple US street address: number + name + a common suffix
+# ("123 Main Street", "123 Main St", "456 Elm Ave").
+_STREET_SUFFIX = (
+    r"(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|"
+    r"court|ct|way|place|pl|circle|cir|terrace|ter)"
+)
+_ADDRESS = re.compile(
+    rf"\b\d{{1,6}}\s+(?:[A-Za-z0-9'.]+\s+){{1,4}}{_STREET_SUFFIX}\b\.?",
+    re.IGNORECASE,
+)
 
 _ABUSIVE = ("idiot", "stupid", "shut up")  # minimal tone screen
 
@@ -194,13 +213,18 @@ def check(candidate: str, semantic_backstop: Optional[SemanticBackstop] = None) 
         return GuardrailResult(action="block", text="", violations=["semantic_backstop"])
 
     # --- 2. PII (redact) ---
-    redacted, n_card = _CARD.subn("[redacted-card]", candidate)
-    redacted, n_ssn = _SSN.subn("[redacted-ssn]", redacted)
-    if n_card or n_ssn:
-        if n_card:
-            violations.append("pii:card")
-        if n_ssn:
-            violations.append("pii:ssn")
+    redacted = candidate
+    for rx, replacement, tag in (
+        (_CARD, "[redacted-card]", "pii:card"),
+        (_SSN, "[redacted-ssn]", "pii:ssn"),
+        (_PHONE, "[redacted-phone]", "pii:phone"),
+        (_EMAIL, "[redacted-email]", "pii:email"),
+        (_ADDRESS, "[redacted-address]", "pii:address"),
+    ):
+        redacted, n = rx.subn(replacement, redacted)
+        if n:
+            violations.append(tag)
+    if violations:
         return GuardrailResult(action="redact", text=redacted, violations=violations)
 
     return GuardrailResult(action="pass", text=candidate, violations=[])

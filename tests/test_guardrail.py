@@ -49,6 +49,59 @@ class GuardrailUnitTests(unittest.TestCase):
         self.assertIn("[redacted-card]", r.text)
         self.assertIn("pii:card", r.violations)
 
+    def test_redacts_email(self):
+        r = guardrail.check("I'll follow up at alice@example.com shortly.")
+        self.assertEqual(r.action, "redact")
+        self.assertIn("[redacted-email]", r.text)
+        self.assertNotIn("alice@example.com", r.text)
+        self.assertIn("pii:email", r.violations)
+
+    def test_redacts_phone(self):
+        for text in (
+            "Call me back on 203-555-0199 anytime.",
+            "My number is (203) 555-0199.",
+        ):
+            with self.subTest(text=text):
+                r = guardrail.check(text)
+                self.assertEqual(r.action, "redact")
+                self.assertIn("[redacted-phone]", r.text)
+                self.assertIn("pii:phone", r.violations)
+
+    def test_redacts_street_address(self):
+        for text in (
+            "Ship it to 123 Main Street, please.",
+            "I'm at 123 Main St.",
+            "The office is 456 Elm Ave.",
+        ):
+            with self.subTest(text=text):
+                r = guardrail.check(text)
+                self.assertEqual(r.action, "redact")
+                self.assertIn("[redacted-address]", r.text)
+                self.assertIn("pii:address", r.violations)
+
+    def test_blocks_unapproved_discount(self):
+        r = guardrail.check("As a one-time deal I'll give you 50% off.")
+        self.assertTrue(r.blocked)
+        self.assertIn("unapproved_discount", r.violations)
+
+    def test_blocks_unapproved_price(self):
+        r = guardrail.check("It's just $9.99/month for the upgrade.")
+        self.assertTrue(r.blocked)
+        self.assertIn("unapproved_amount:$9.99", r.violations)
+        self.assertIn("unapproved_recurring_price", r.violations)
+
+    def test_public_guardrail_demo_candidate_is_blocked(self):
+        # The exact canned candidate the public Streamlit guardrail demo shows.
+        candidate = (
+            "Good news — I reset your router, and I can also give you 50% off "
+            "your next bill for just $9.99/month. Want me to apply it?"
+        )
+        r = guardrail.check(candidate)
+        self.assertTrue(r.blocked)
+        self.assertIn("unapproved_amount:$9.99", r.violations)
+        self.assertIn("unapproved_recurring_price", r.violations)
+        self.assertIn("unapproved_discount", r.violations)
+
     def test_blocks_abusive_tone(self):
         r = guardrail.check("Don't be stupid, just reboot it.")
         self.assertTrue(r.blocked)
