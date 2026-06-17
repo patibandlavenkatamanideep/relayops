@@ -56,6 +56,10 @@ class ApiTurnTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(d["escalated"])
             self.assertIsNotNone(d["handoff"])
             self.assertEqual(d["handoff"]["owner"], "billing_support")
+            self.assertEqual(d["pre_action_intent_packet"]["requested_action"], "billing_refund")
+            self.assertEqual(d["broker_decision_packet"]["decision"], "escalate")
+            self.assertEqual(d["guardrail_result"]["verdict"], "not_reached")
+            self.assertEqual(d["audit_record"]["turn_id"], d["turn_id"])
             self.assertEqual(d["trace"]["broker_decision_packet"]["decision"], "escalate")
             self.assertEqual(
                 d["trace"]["final_reply_packet"]["source"], "broker_decision_packet"
@@ -104,6 +108,12 @@ class ApiTurnTests(unittest.IsolatedAsyncioTestCase):
         async with _client() as c:
             d = await self._turn(c, message="hello there", token="tok_alice")
             self.assertTrue(d["turn_id"].startswith("turn_"), d["turn_id"])
+            self.assertEqual(
+                d["pre_action_intent_packet"]["policy_handle"],
+                "conversation.greeting.respond_allowed",
+            )
+            self.assertEqual(d["broker_decision_packet"]["decision"], "allow")
+            self.assertEqual(d["disposition"], "respond")
 
     async def test_audit_endpoint_retrieves_turn(self):
         async with _client() as c:

@@ -19,7 +19,9 @@ Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamani
 >
 > **Invariant:** the model can propose; the broker decides; the tool executes
 > only if allowed; the final reply is generated from the broker decision; the
-> human or organization remains accountable.
+> audit trail records every state; the human or organization remains accountable.
+> Roadmap: Hermes reviews the audit trail and drafts follow-up work for human
+> developer review.
 
 | Signal | Result |
 |---|---|
@@ -167,6 +169,7 @@ Example packet trace for a billing request:
 | 50-ticket batch runner | 27 auto-resolved, 20 human handoff, 3 safe-blocked |
 | Batch safety | **0 unsafe auto-actions**, **0 billing escapes**, 50/50 audited |
 | Packet audit schema | Pre-action intent, broker decision, and final reply packets persisted per turn |
+| FastAPI `/v1/turn` contract | returns `turn_id`, reply, intent, disposition, escalation, packets, guardrail result, handoff, audit record |
 | Manual time saved estimate | 27 x 4 min = 108 min, illustrative only |
 | 100-case adversarial routing (in-set) | safe-route 1.000, route-correct 0.890 |
 | 42-case held-out routing (cues frozen) | **safe-route 0.786, route-correct 0.667** |
@@ -345,7 +348,8 @@ slice can't action), and the **top failure categories**.
 | Keyword, NB, calibrated NB, Qwen LoRA classifiers | Voice |
 | 100-case Qwen adversarial rerun | Event bus |
 | FastAPI service boundary + request-level audit | Shadow/canary rollout |
-| Pre-Action Intent Packet | Hermes-style operator agent |
+| `/v1/turn` packet/audit response contract | Hermes-style operator agent |
+| Pre-Action Intent Packet | Production traffic validation |
 | Policy Broker + Broker Decision Packet | Production traffic validation |
 | Final Reply Packet generated from broker decision | Cost per resolved ticket |
 | Hybrid RAG with citations | Design-partner redacted-queue run |
@@ -365,33 +369,41 @@ claims. Deterministic tests and evals remain the source of truth.
 
 ```mermaid
 flowchart TD
-    A[Customer request] --> B["Access gate<br/>authn"]
-    B --> C["Customer scope<br/>permissions"]
-    C --> D["Model / router<br/>intent + confidence"]
+    A[Customer request] --> R["RelayOps Runtime"]
+    R --> B["Access Gate<br/>authn"]
+    B --> D["Router / Model Proposal<br/>intent + confidence"]
     D --> E["Pre-Action Intent Packet<br/>proposal, action, resource, evidence"]
     E --> F["Policy Broker<br/>deterministic policy"]
     F --> G{Decision}
-    G -->|allow| H["Scoped Tool / Context Broker<br/>tools + RAG, scope enforced"]
-    G -->|ask clarification| I[Clarification reply]
+    G -->|allow| H["Scoped Tool Execution<br/>scope enforced"]
+    G -->|clarify| I[Clarification reply]
     G -->|escalate| J[Human handoff]
     G -->|block| J
-    H --> K["Tool / Context Result Packet"]
-    K --> L["Broker Decision Packet<br/>source of truth"]
+    H --> L["Broker Decision Packet<br/>source of truth"]
+    J --> L
     I --> L
-    F -->|no tool needed| L
     L --> M["Final Reply Composer<br/>from broker decision"]
     M --> N["Guardrail<br/>offers, PII, tone"]
-    N -->|pass| O[Customer response]
-    N -->|fail| J
-    E --> P["Audit trail<br/>all packets + final response"]
+    N --> O["Customer response<br/>or handoff"]
+    E --> P["Audit Store<br/>all states + packets"]
     F --> P
     H --> P
-    K --> P
+    J --> P
+    I --> P
     L --> P
     N --> P
     O --> P
-    J --> P
-    P --> Q["Human / organization accountability"]
+    P --> Q["Hermes Operator Agent<br/>planned audit reviewer"]
+    Q --> Q1[Failure summary]
+    Q --> Q2[Suggested tests]
+    Q --> Q3[Suggested GitHub issues]
+    Q --> Q4[Release notes draft]
+    Q --> Q5[Policy gap suggestions]
+    Q1 --> Z[Human developer review]
+    Q2 --> Z
+    Q3 --> Z
+    Q4 --> Z
+    Q5 --> Z
 ```
 
 <details>
@@ -401,15 +413,14 @@ flowchart TD
 customer chat turn
       |
       v
+RELAYOPS RUNTIME
+      |
+      v
 ACCESS GATE
 authn
       |
       v
-CUSTOMER SCOPE
-permissions and allowed resources
-      |
-      v
-MODEL / ROUTER
+ROUTER / MODEL PROPOSAL
 intent + confidence
       |
       v
@@ -421,8 +432,8 @@ POLICY BROKER
 allow / block / escalate / ask clarification
       |
       v
-SCOPED TOOL OR CONTEXT BROKER
-executes only if allowed; returns tool/context result packet
+SCOPED TOOL EXECUTION / HUMAN HANDOFF / CLARIFICATION
+tools execute only if allowed
       |
       v
 BROKER DECISION PACKET
@@ -437,7 +448,15 @@ GUARDRAIL
 pass -> customer response; fail -> human handoff
       |
       v
-AUDIT TRAIL -> HUMAN / ORGANIZATION ACCOUNTABILITY
+AUDIT STORE
+records every state and packet
+      |
+      v
+HERMES OPERATOR AGENT (planned)
+failure summary, suggested tests, GitHub issues, release notes, policy gaps
+      |
+      v
+HUMAN DEVELOPER REVIEW / ORGANIZATION ACCOUNTABILITY
 ```
 
 </details>
@@ -468,6 +487,7 @@ is allowed to say.
 | v2.1 | JWT auth + rate limiting | planned |
 | v2.2 | external action envelope | planned |
 | v2.3 | real MCP/tool-server boundary | planned |
+| v2.4 | Hermes operator agent over audit trails | planned |
 
 ## Limitations
 

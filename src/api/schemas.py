@@ -41,6 +41,10 @@ class TurnResponse(BaseModel):
     tier: str
     disposition: str
     escalated: bool
+    pre_action_intent_packet: dict[str, Any]
+    broker_decision_packet: dict[str, Any]
+    guardrail_result: dict[str, Any]
+    audit_record: dict[str, Any]
     trace: dict[str, Any]
     tool_results: list[ToolResultModel] = Field(default_factory=list)
     handoff: Optional[dict[str, Any]] = None

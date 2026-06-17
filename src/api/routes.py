@@ -103,6 +103,10 @@ async def post_turn(req: TurnRequest) -> TurnResponse:
         tier=response.tier.value,
         disposition=response.disposition.value,
         escalated=response.escalated,
+        pre_action_intent_packet=record.pre_action_intent_packet,
+        broker_decision_packet=record.broker_decision_packet,
+        guardrail_result=record.guardrail,
+        audit_record=record.to_dict(),
         trace=record.to_dict(),
         tool_results=[
             ToolResultModel(ok=r.ok, data=r.data, error=r.error)

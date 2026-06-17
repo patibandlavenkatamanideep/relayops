@@ -33,8 +33,12 @@ classifier and tone). It is tested with simulations and a calibrated judge, and
 measured by cost per successfully resolved task.
 
 Core invariant: **the model proposes; the broker decides; the tool executes only
-if allowed; the final reply is generated from the broker decision; the human or
-organization remains accountable.**
+if allowed; the final reply is generated from the broker decision; the audit trail
+records every state; Hermes reviews the audit trail; the human or organization
+remains accountable.**
+
+Hermes is a planned operator/review agent over audit evidence, not a
+customer-support runtime decision-maker.
 
 ## 1. Portfolio scope — what gets built vs. what's designed-only
 This is the most important section. The full design below is sound, but building all
@@ -133,7 +137,14 @@ truthfulness · allowed offers · tone · PII
       |
       v
 AUDIT TRAIL / DECISION CONSOLE / EXPORT
-all packets + final response -> human / organization accountability
+all packets + final response
+      |
+      v
+HERMES OPERATOR AGENT (planned)
+failure summaries, suggested tests, GitHub issues, release notes, policy gaps
+      |
+      v
+HUMAN DEVELOPER REVIEW / ORGANIZATION ACCOUNTABILITY
 ```
 
 Two load-bearing facts (unchanged from the target design):
