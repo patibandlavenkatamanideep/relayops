@@ -47,6 +47,10 @@ def review_record(record: dict[str, Any]) -> Optional[HermesReviewPacket]:
     route = record.get("route", "")
     handoff_reason = record.get("handoff_reason") or ""
     guardrail = _as_dict(record.get("guardrail"))
+    # The in-memory record carries a `guardrail` dict (verdict + violations); a
+    # durable store row carries a flat `guardrail_verdict` column instead. Accept
+    # either so Hermes works against both shapes.
+    guardrail_verdict = guardrail.get("verdict") or record.get("guardrail_verdict")
     broker = _as_dict(record.get("broker_decision_packet"))
     action_class = record.get("action_class", "")
     blast_radius = record.get("blast_radius", "")
@@ -77,7 +81,7 @@ def review_record(record: dict[str, Any]) -> Optional[HermesReviewPacket]:
 
     # 3. Guardrail block (medium): a model proposal carried an unsafe
     #    offer/price/PII/tone and was blocked before reaching the customer.
-    if guardrail.get("verdict") == "block" or handoff_reason == "guardrail_block":
+    if guardrail_verdict == "block" or handoff_reason == "guardrail_block":
         violations = guardrail.get("violations") or []
         joined = ", ".join(violations) if violations else "policy violation"
         return HermesReviewPacket(

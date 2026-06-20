@@ -110,6 +110,52 @@ class HermesReportTests(unittest.TestCase):
         self.assertIn("No findings", report.failure_summary)
 
 
+class HermesStoreIntegrationTests(unittest.TestCase):
+    """Hermes must work against durable store rows (packets as JSON strings,
+    guardrail as a flat `guardrail_verdict` column), not just in-memory dicts."""
+
+    def _store(self):
+        import os
+        import tempfile
+
+        from src.observability.audit_store import AuditStore
+
+        path = os.path.join(tempfile.mkdtemp(), "hermes_audit.sqlite3")
+        return AuditStore(path)
+
+    def test_review_over_store_rows(self):
+        store = self._store()
+        store.write_row(
+            {
+                "turn_id": "t_fail",
+                "route": "human_escalation",
+                "action_class": "send_troubleshooting_link",
+                "blast_radius": "low",
+                "handoff_reason": "fail_closed:guardrail_unavailable",
+                "broker_decision_packet": json.dumps({"decision": "escalate", "policy_handle": "safety.fail_closed"}),
+            }
+        )
+        store.write_row(
+            {
+                "turn_id": "t_block",
+                "route": "human_escalation",
+                "action_class": "device_reset",
+                "blast_radius": "low",
+                "handoff_reason": "guardrail_block",
+                "guardrail_verdict": "block",
+                "broker_decision_packet": json.dumps({"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"}),
+            }
+        )
+        store.write_row({"turn_id": "t_ok", "route": "respond", "blast_radius": "low"})
+
+        report = build_report(store.list(limit=50))
+        store.close()
+
+        types = {f.finding_type for f in report.findings}
+        self.assertEqual(types, {"fail_closed", "guardrail_block"})
+        self.assertEqual(len(report.findings), 2)
+
+
 class HermesIsAdvisoryOnlyTests(unittest.TestCase):
     def test_no_execute_surface(self):
         # Hermes must not expose any action/execution API — it only reviews.
