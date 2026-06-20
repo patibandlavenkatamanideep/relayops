@@ -103,6 +103,10 @@ async def post_turn(req: TurnRequest) -> TurnResponse:
         tier=response.tier.value,
         disposition=response.disposition.value,
         escalated=response.escalated,
+        pre_action_intent_packet=record.pre_action_intent_packet,
+        broker_decision_packet=record.broker_decision_packet,
+        guardrail_result=record.guardrail,
+        audit_record=record.to_dict(),
         trace=record.to_dict(),
         tool_results=[
             ToolResultModel(ok=r.ok, data=r.data, error=r.error)
@@ -123,3 +127,17 @@ async def get_audit(turn_id: str) -> JSONResponse:
 @router.get("/v1/handoffs", response_model=HandoffsResponse)
 async def get_handoffs(limit: int = 20) -> HandoffsResponse:
     return HandoffsResponse(handoffs=get_store().handoffs(limit=limit))
+
+
+@router.get("/v1/operator/review")
+async def operator_review(limit: int = 100) -> JSONResponse:
+    """Read-only Hermes operator review over recent audit traces.
+
+    Operator-side, not customer-facing: it returns advisory findings and drafts
+    (failure summary, suggested tests, policy gaps, issues, release notes). It
+    never executes anything — see ``src/hermes``.
+    """
+    from ..hermes import build_report
+
+    report = build_report(get_store().list(limit=limit))
+    return JSONResponse(status_code=200, content=report.to_dict())

@@ -25,6 +25,25 @@ from . import action_policy
 
 POLICY_VERSION = "relayops_policy_v1"
 
+# Reason codes for the fail-closed invariant: if a safety-critical layer cannot
+# render a verdict, RelayOps must fail closed (escalate / hand off) — never
+# silently allow. These label *why* the safe path was forced.
+FAIL_CLOSED_REASONS = frozenset(
+    {
+        "guardrail_unavailable",
+        "rag_no_evidence",
+        "composer_timeout",
+        "policy_lookup_failed",
+        "missing_required_evidence",
+        "unsafe_candidate_blocked",
+        "over_block_review",
+    }
+)
+
+_GREETING_ACTION = "greeting_response"
+_GREETING_POLICY_HANDLE = "conversation.greeting.respond_allowed"
+_GREETING_RULE = "safe_greeting_response_allowed"
+
 
 _POLICY_HANDLES = {
     action_policy.ActionClass.DEVICE_RESET: "device.reset.allowed_if_scoped",
@@ -114,6 +133,17 @@ def _action_from_state(state: TurnState) -> action_policy.ActionClass:
     return action_policy.classify_action(state.classification.intent, reason)
 
 
+def _is_safe_greeting(state: TurnState) -> bool:
+    return (
+        state.classification is not None
+        and state.classification.intent == Intent.GREETING
+        and state.route is not None
+        and state.route.disposition == Disposition.RESPOND
+        and state.route.tool is None
+        and not state.route.retrieve
+    )
+
+
 def _handle(action: action_policy.ActionClass) -> str:
     return _POLICY_HANDLES[action]
 
@@ -127,6 +157,21 @@ def build_pre_action_intent_packet(state: TurnState) -> PreActionIntentPacket:
 
     assert state.classification is not None
     assert state.route is not None
+    if _is_safe_greeting(state):
+        confidence = round(state.classification.confidence, 2)
+        return PreActionIntentPacket(
+            turn_id=state.turn_id,
+            user_request=state.text,
+            model_interpretation=_MODEL_INTERPRETATIONS[Intent.GREETING],
+            requested_action=_GREETING_ACTION,
+            target_resource="conversation",
+            policy_handle=_GREETING_POLICY_HANDLE,
+            evidence_quote=state.text,
+            confidence=confidence,
+            ambiguity="" if confidence >= 0.75 else "classification confidence is moderate",
+            proposed_safe_response="I can greet the customer and offer supported help.",
+        )
+
     action = _action_from_state(state)
     confidence = round(state.classification.confidence, 2)
     ambiguity = ""
@@ -177,6 +222,24 @@ def decide_pre_action(state: TurnState) -> BrokerDecisionPacket:
             state=state,
             action=action,
             reason_code=state.route.reason or "requires_human_review",
+        )
+
+    if _is_safe_greeting(state):
+        return BrokerDecisionPacket(
+            turn_id=state.turn_id,
+            decision="allow",
+            policy_version=POLICY_VERSION,
+            policy_handle=_GREETING_POLICY_HANDLE,
+            matched_rule=_GREETING_RULE,
+            reason_code="policy_allow",
+            owner="general_support",
+            human_queue="",
+            allowed_next_actions=["respond_without_tool"],
+            forbidden_next_actions=[
+                "run_tool",
+                "quote_account_data",
+                "invent_policy_or_account_data",
+            ],
         )
 
     if policy.route == action_policy.PolicyRoute.ESCALATE:
@@ -281,6 +344,36 @@ def decision_from_guardrail_block(
     )
 
 
+def decision_from_fail_closed(
+    state: TurnState, reason_code: str, stage: str
+) -> BrokerDecisionPacket:
+    """Build a fail-closed escalation when a safety-critical layer cannot render
+    a verdict (an exception, timeout, or unavailable dependency).
+
+    Deliberately self-contained: it does NOT consult ``action_policy`` (which may
+    itself be the failed layer) so it can always produce a safe handoff. The
+    invariant is: no verdict -> escalate, never silently allow.
+    """
+
+    return BrokerDecisionPacket(
+        turn_id=state.turn_id,
+        decision="escalate",
+        policy_version=POLICY_VERSION,
+        policy_handle="safety.fail_closed",
+        matched_rule="safety_layer_unavailable_fail_closed",
+        reason_code=reason_code,
+        missing_evidence=[f"verdict_from:{stage}"],
+        owner="general_support",
+        human_queue="general_support",
+        allowed_next_actions=["explain_safe_handoff", "route_to_human"],
+        forbidden_next_actions=[
+            "run_tool",
+            "send_unverified_reply",
+            "claim_action_completed",
+        ],
+    )
+
+
 def build_final_reply_packet(
     state: TurnState,
     *,
@@ -338,6 +431,11 @@ def compose_escalation_reply(decision: BrokerDecisionPacket | None) -> str:
         return (
             "I can't send an unverified offer, price, or account claim. I'll "
             "connect you with a specialist who can review this safely."
+        )
+    if handle == "safety.fail_closed" or reason in FAIL_CLOSED_REASONS:
+        return (
+            "I can't complete this safely right now, so I'm routing you to a "
+            "specialist who can review and follow up with the full context."
         )
     return (
         "I'm connecting you with a specialist who can help with this — they'll "

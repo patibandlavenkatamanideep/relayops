@@ -16,6 +16,7 @@ the fine-tuned classifier (step 4), eval (step 5) and richer observability
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Protocol
 from uuid import uuid4
@@ -37,6 +38,8 @@ from ..rag.retriever import HybridRetriever
 from ..rag.store import load_chunks
 from ..router import action_policy, policy_broker, router
 from ..router.classifier import BaselineClassifier, IntentClassifier
+
+logger = logging.getLogger(__name__)
 
 # Number of cited chunks to retrieve for an FAQ answer.
 _RAG_K = 2
@@ -289,12 +292,26 @@ def handle_turn(
             audit.record(state, response, name, turn_id=state.turn_id)
         return response
 
+    def fail_closed(reason_code: str, stage: str) -> AgentResponse:
+        """Fail-closed invariant: when a safety-critical layer can't render a
+        verdict (raised), force a safe human handoff instead of allowing the
+        turn. The reply is generated from the broker packet, never raw model
+        output, and the audit record captures why."""
+        logger.warning("fail_closed: stage=%s reason=%s turn=%s", stage, reason_code, state.turn_id)
+        state.broker_decision = policy_broker.decision_from_fail_closed(state, reason_code, stage)
+        return finalize(_escalate(state, reason=f"fail_closed:{reason_code}"))
+
     state = ingest(state)
     state = access_gate(state)
     state = classify(state, classifier)
     state = decide_route(state)
-    state = build_pre_action_packet(state)
-    state = broker_decide(state)
+
+    # Proposal + policy decision. If the broker itself can't decide, fail closed.
+    try:
+        state = build_pre_action_packet(state)
+        state = broker_decide(state)
+    except Exception:
+        return fail_closed("policy_lookup_failed", "policy_broker")
 
     # The broker is the source of truth. A non-allow decision never reaches a
     # tool or raw model-composed reply.
@@ -304,22 +321,36 @@ def handle_turn(
             reason = state.route.reason
         return finalize(_escalate(state, reason=reason))
 
-    state = run_tool(state)
+    try:
+        state = run_tool(state)
+    except Exception:
+        return fail_closed("tool_unavailable", "scoped_tool")
     if state.tool_results and not state.tool_results[-1].ok:
         error = state.tool_results[-1].error or "tool_failed"
         state.broker_decision = policy_broker.decision_from_tool_error(state, error)
         return finalize(_escalate(state, reason=f"tool_error:{error}"))
 
     if state.route and state.route.retrieve:
-        state = retrieve(state)
+        try:
+            state = retrieve(state)
+        except Exception:
+            return fail_closed("rag_unavailable", "rag")
         # No grounding found -> don't answer from nothing; escalate.
         if not state.retrieved:
             state.broker_decision = policy_broker.decision_from_unverifiable(state)
             return finalize(_escalate(state, reason="unverifiable"))
 
-    candidate = composer.compose(state)
-    # INDEPENDENT GUARDRAIL: vet the candidate before it ships.
-    guard = guardrail.check(candidate)
+    # Compose the candidate and vet it. A failure in either safety layer fails
+    # closed rather than shipping an unvetted reply.
+    try:
+        candidate = composer.compose(state)
+    except Exception:
+        return fail_closed("composer_timeout", "composer")
+    try:
+        guard = guardrail.check(candidate)
+    except Exception:
+        return fail_closed("guardrail_unavailable", "guardrail")
+
     if guard.blocked:
         # A hallucinated offer/price (or tone breach) is escalated to a human.
         state.broker_decision = policy_broker.decision_from_guardrail_block(

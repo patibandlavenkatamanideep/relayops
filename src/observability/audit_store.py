@@ -249,6 +249,12 @@ class AuditStore:
             and r["route"] != "human_escalation"
         )
 
+        # Fail-closed turns: a safety-critical layer couldn't render a verdict and
+        # the turn was forced to a safe handoff (reason "fail_closed:<code>").
+        fail_closed = sum(
+            1 for r in rows if str(r.get("handoff_reason") or "").startswith("fail_closed:")
+        )
+
         return {
             "audit_records": len(rows),
             "route_distribution": dict(routes),
@@ -258,6 +264,8 @@ class AuditStore:
             "handoff_completeness": completeness,
             "unsafe_auto_action": unsafe_auto,
             "billing_escape": billing_escape,
+            "fail_closed": fail_closed,
+            "fail_closed_rate": (fail_closed / len(rows)) if rows else 0.0,
         }
 
     def close(self) -> None:
