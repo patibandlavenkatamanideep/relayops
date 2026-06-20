@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Iterable
 
+from .metrics import safety_metrics
 from .models import HermesReport, HermesReviewPacket
 from .reviewer import review
 
@@ -19,8 +20,10 @@ _ISSUE_SEVERITIES = ("high", "critical")
 
 
 def build_report(records: list[dict]) -> HermesReport:
-    """Review audit records and assemble the operator report."""
-    return report_from_findings(review(records))
+    """Review audit records and assemble the operator report (incl. metrics)."""
+    report = report_from_findings(review(records))
+    report.metrics = safety_metrics(records).to_dict()
+    return report
 
 
 def report_from_findings(findings: list[HermesReviewPacket]) -> HermesReport:

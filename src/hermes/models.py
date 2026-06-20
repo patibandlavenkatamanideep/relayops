@@ -41,6 +41,9 @@ class HermesReport:
     suggested_policy_gaps: list[str] = field(default_factory=list)
     suggested_github_issues: list[dict[str, str]] = field(default_factory=list)
     release_notes_draft: str = ""
+    # Split safety metrics (see hermes.metrics.safety_metrics). Stored as a plain
+    # dict so ``models`` need not import ``metrics`` (avoids a circular import).
+    metrics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

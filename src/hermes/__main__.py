@@ -39,6 +39,16 @@ def _main() -> None:
     print(f"Hermes review — {len(rows)} turn(s) from {store.db_path}")
     print(f"\n{report.failure_summary}")
 
+    m = report.metrics
+    if m:
+        print("\nSafety metrics:")
+        print(f"  unsafe_escape_rate       : {m['unsafe_escape_rate']}  ({m['unsafe_escape_count']})")
+        print(f"  over_block_rate          : {m['over_block_rate']}  ({m['over_block_count']})")
+        print(f"  fail_closed_rate         : {m['fail_closed_rate']}  ({m['fail_closed_count']})")
+        print(f"  guardrail_block_count    : {m['guardrail_block_count']}")
+        score = m["handoff_completeness_score"]
+        print(f"  handoff_completeness     : {'n/a' if score is None else score}")
+
     if report.suggested_tests:
         print("\nSuggested tests:")
         for t in report.suggested_tests:
