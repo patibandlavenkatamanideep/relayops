@@ -10,6 +10,7 @@ the customer runtime: no replies, no tools, no policy edits, no broker overrides
 
 from __future__ import annotations
 
+from .metrics import SafetyMetrics, safety_metrics
 from .models import HermesReport, HermesReviewPacket
 from .report import build_report, report_from_findings
 from .reviewer import review, review_record
@@ -17,6 +18,8 @@ from .reviewer import review, review_record
 __all__ = [
     "HermesReviewPacket",
     "HermesReport",
+    "SafetyMetrics",
+    "safety_metrics",
     "review",
     "review_record",
     "build_report",
