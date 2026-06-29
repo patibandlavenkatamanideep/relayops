@@ -191,6 +191,14 @@ Keep the server small and tightly scoped — three well-permissioned tools read 
 better than a broad surface. The screenshot-able artifact for the portfolio: an
 injection attempt, and the MCP server refusing it.
 
+- **Datastore (v2.0).** The account/device data behind the tools lives in a SQLite
+  customer/auth store (`src/core/customer_store.py`): `customers`, `devices`, and
+  `auth_tokens` tables behind the same scoped accessors. The schema is the
+  contract — a real deployment points the accessors at managed Postgres. The
+  default store is in-memory and re-seeded per process; `RELAYOPS_CUSTOMER_DB`
+  makes it durable. The scope boundary is unchanged: a device is owned by exactly
+  one customer, enforced by the query, not the model.
+
 ## 5. Fine-tuning (intent classifier first)
 Strictly inside the volatility split: fine-tuning is for the intent classifier and
 (optionally) tone — never facts. "Facts in weights" stays an avoided anti-pattern;
