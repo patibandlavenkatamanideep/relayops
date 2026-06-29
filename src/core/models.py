@@ -158,6 +158,7 @@ class AgentResponse:
     guardrail_action: str = "pass"  # pass | redact | block
     guardrail_violations: list[str] = field(default_factory=list)
     citations: list[dict[str, Any]] = field(default_factory=list)
+    action_envelopes: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -178,4 +179,5 @@ class TurnState:
     final_reply: Optional[FinalReplyPacket] = None
     tool_results: list[ToolResult] = field(default_factory=list)
     retrieved: list[Any] = field(default_factory=list)  # RetrievedChunk list
+    action_envelopes: list[Any] = field(default_factory=list)  # ActionEnvelope list
     response: Optional[AgentResponse] = None

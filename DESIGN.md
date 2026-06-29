@@ -89,6 +89,13 @@ a vertical slice that proves the load-bearing ideas."*
   blast radius, and the matched rules that resolve to each — and is *enforced*:
   tests drive the broker over representative turns and fail if it emits a handle
   the registry does not define, so no undocumented policy can ship.
+- **Action envelope (v2.2)** — every side-effecting action (a device reset) runs
+  inside an `ActionEnvelope` (`src/actions`): action id, target resource, owning
+  policy handle, blast radius, reversibility, an idempotency key, and a lifecycle
+  status (pending → succeeded / failed / refused, or replayed). An idempotency
+  ledger replays a previously succeeded action instead of running it twice — the
+  safe-retry boundary for actions that reach an external system. The envelope is
+  recorded on the turn response and the audit trail.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.

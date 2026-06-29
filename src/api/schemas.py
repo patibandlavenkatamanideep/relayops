@@ -47,6 +47,7 @@ class TurnResponse(BaseModel):
     audit_record: dict[str, Any]
     trace: dict[str, Any]
     tool_results: list[ToolResultModel] = Field(default_factory=list)
+    action_envelopes: list[dict[str, Any]] = Field(default_factory=list)
     handoff: Optional[dict[str, Any]] = None
 
 

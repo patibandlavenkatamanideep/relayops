@@ -271,6 +271,7 @@ class AuditRecord:
     risk_signal: str
     available_context: list[str]
     unavailable_context: list[str]
+    action_envelopes: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -299,6 +300,7 @@ class AuditRecord:
             "risk_signal": self.risk_signal,
             "available_context": self.available_context,
             "unavailable_context": self.unavailable_context,
+            "action_envelopes": self.action_envelopes,
         }
 
 
@@ -373,6 +375,7 @@ def build_record(
         risk_signal=_RISK_SIGNALS[action],
         available_context=_available_context(state),
         unavailable_context=list(_UNAVAILABLE_CONTEXT.get(action, [])),
+        action_envelopes=[e.to_dict() for e in state.action_envelopes],
     )
 
 

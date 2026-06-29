@@ -177,6 +177,7 @@ async def post_turn(
         tool_results=[
             ToolResultModel(ok=r.ok, data=r.data, error=r.error) for r in response.tool_results
         ],
+        action_envelopes=response.action_envelopes,
         handoff=response.handoff_context,
     )
 
