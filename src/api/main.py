@@ -17,11 +17,12 @@ from .routes import router
 def create_app() -> FastAPI:
     app = FastAPI(
         title="RelayOps API",
-        version="1.8",
+        version="2.1",
         description=(
             "Service boundary for RelayOps support turns. Wraps the deterministic "
             "pipeline: scoped access gate, route safety, guardrail, durable audit, "
-            "human handoff. LLM composer stays opt-in and disabled by default."
+            "human handoff. Signed bearer-token auth and per-caller rate limiting "
+            "guard the API; the LLM composer stays opt-in and disabled by default."
         ),
     )
     app.include_router(router)

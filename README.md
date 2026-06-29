@@ -8,12 +8,12 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v2.0 working prototype** — FastAPI service layer, request-level audit,
-Pre-Action Intent Packets, Broker Decision Packets, an enforced policy-handle
-registry, a SQLite customer/auth datastore, a read-only Hermes operator review,
-live Streamlit demo, Decision Console, Handoff Queue, support-ticket batch runner,
-public-dataset importers, Qwen LoRA evals, optional local LLM composer, and pinned
-Railway deployment.
+Status: **v2.1 working prototype** — FastAPI service layer with signed bearer-token
+auth and per-caller rate limiting, request-level audit, Pre-Action Intent Packets,
+Broker Decision Packets, an enforced policy-handle registry, a SQLite customer/auth
+datastore, a read-only Hermes operator review, live Streamlit demo, Decision
+Console, Handoff Queue, support-ticket batch runner, public-dataset importers, Qwen
+LoRA evals, optional local LLM composer, and pinned Railway deployment.
 Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
 
 > **Core thesis:** RelayOps treats AI support as a control system: scoped
@@ -486,7 +486,7 @@ is allowed to say.
 | v1.8.1 | Pre-Action Intent Packet + Broker Decision Packet | shipped |
 | v1.9 | policy registry / policy handles | shipped |
 | v2.0 | datastore + SQLite customer/auth store | shipped |
-| v2.1 | JWT auth + rate limiting | planned |
+| v2.1 | JWT auth + rate limiting | shipped |
 | v2.2 | external action envelope | planned |
 | v2.3 | real MCP/tool-server boundary | planned |
 | v2.4 | Hermes operator agent over audit trails | planned |
