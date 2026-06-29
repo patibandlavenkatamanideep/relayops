@@ -59,8 +59,16 @@ class JwtTests(unittest.TestCase):
         import base64
         import json
 
-        header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=").decode()
-        payload = base64.urlsafe_b64encode(json.dumps({"tok": "x", "exp": 9999999999}).encode()).rstrip(b"=").decode()
+        header = (
+            base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode())
+            .rstrip(b"=")
+            .decode()
+        )
+        payload = (
+            base64.urlsafe_b64encode(json.dumps({"tok": "x", "exp": 9999999999}).encode())
+            .rstrip(b"=")
+            .decode()
+        )
         with self.assertRaises(auth.AuthError):
             auth.verify(f"{header}.{payload}.")
 
@@ -147,9 +155,7 @@ class AuthEndpointTests(unittest.IsolatedAsyncioTestCase):
     async def test_turn_body_token_still_works(self):
         # Backward compat: the pre-v2.1 body token path is unchanged.
         async with _client() as c:
-            r = await c.post(
-                "/v1/turn", json={"message": "reset my router", "token": "tok_alice"}
-            )
+            r = await c.post("/v1/turn", json={"message": "reset my router", "token": "tok_alice"})
             self.assertEqual(r.status_code, 200, r.text)
             self.assertEqual(r.json()["intent"], "reset_device")
 

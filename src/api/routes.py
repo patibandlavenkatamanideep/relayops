@@ -118,7 +118,9 @@ def _resolve_auth_token(req: TurnRequest, authorization: str | None) -> str | No
 
 
 @router.post("/v1/turn", response_model=TurnResponse)
-async def post_turn(req: TurnRequest, authorization: str | None = Header(default=None)) -> TurnResponse:
+async def post_turn(
+    req: TurnRequest, authorization: str | None = Header(default=None)
+) -> TurnResponse:
     try:
         auth_token = _resolve_auth_token(req, authorization)
     except auth.AuthError as exc:
