@@ -8,10 +8,11 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v2.2 working prototype** — FastAPI service layer with signed bearer-token
+Status: **v2.4 working prototype** — FastAPI service layer with signed bearer-token
 auth and per-caller rate limiting, request-level audit, Pre-Action Intent Packets,
-Broker Decision Packets, an enforced policy-handle registry, external action
-envelopes with idempotent replay, a SQLite customer/auth datastore, a read-only
+Broker Decision Packets, an enforced policy-handle registry, an MCP-style
+tool-server boundary, external action envelopes with idempotent replay, replay
+verification over audit traces, a SQLite customer/auth datastore, a read-only
 Hermes operator review, live Streamlit demo, Decision Console, Handoff Queue,
 support-ticket batch runner, public-dataset importers, Qwen LoRA evals, optional
 local LLM composer, and pinned Railway deployment.
@@ -470,6 +471,27 @@ it still cannot widen its own permissions. A model can propose an unsafe action,
 but the broker packet decides what can execute and what the final customer reply
 is allowed to say.
 
+## Replay verification (v2.4)
+
+RelayOps can re-check a prior audited action flow against a replayed flow and
+report where they diverge. The verifier (`src/replay`) is deterministic and
+read-only — it compares two recorded flows, it never re-runs a tool or changes
+policy — and detects:
+
+- **broker-decision drift** — the policy decision changed between runs;
+- **action-envelope drift** — the wrapped action's identity changed;
+- **tool-response drift** — the scoped tool returned a different result;
+- **missing audit records** — an original or replay trace is absent;
+- **scope mismatch** — the replay ran under a different customer/caller (blocking);
+- **double-execution risk** — a replay re-ran an idempotent action instead of
+  replaying it (blocking).
+
+This helps detect policy drift, missing audit records, unsafe replay behavior,
+scope mismatches, and inconsistent tool results. Replay metrics
+(`replay_success_rate`, mismatch / blocked / missing-audit counts) and Hermes
+findings surface the results for a human; Hermes stays advisory and never
+executes a replay.
+
 ## Roadmap
 
 | Version | Theme | Status |
@@ -489,8 +511,8 @@ is allowed to say.
 | v2.0 | datastore + SQLite customer/auth store | shipped |
 | v2.1 | JWT auth + rate limiting | shipped |
 | v2.2 | external action envelope | shipped |
-| v2.3 | real MCP/tool-server boundary | planned |
-| v2.4 | Hermes operator agent over audit trails | planned |
+| v2.3 | MCP-style tool-server boundary | shipped |
+| v2.4 | replay verification + audit consistency | shipped |
 
 ## Limitations
 
