@@ -19,7 +19,13 @@ dependencies = [
     # UI
     "streamlit>=1.38",
     # Service boundary (v1.8) — wraps the pipeline behind an HTTP API.
-    "fastapi>=0.110",
+    # FastAPI + Starlette are pinned as a verified-compatible pair: a loose
+    # `fastapi>=0.110` let environments resolve an old FastAPI against a new
+    # Starlette, hitting `Router.__init__() got an unexpected keyword argument
+    # 'on_startup'` during API test collection. Pinning both keeps local and CI
+    # on the same working pair.
+    "fastapi==0.137.1",
+    "starlette==1.2.1",
     "uvicorn>=0.30",
     # Misc
     "pydantic>=2.7",
