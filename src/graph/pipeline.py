@@ -22,7 +22,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from ..access import gate
-from ..actions import execute_action
+from ..actions import ActionEnvelope
 from ..core import data
 from ..core.models import (
     Action,
@@ -33,12 +33,12 @@ from ..core.models import (
     TurnState,
 )
 from ..guardrails import guardrail
-from ..mcp import tools
 from ..observability.audit_ledger import AuditLedger
 from ..rag.retriever import HybridRetriever
 from ..rag.store import load_chunks
 from ..router import action_policy, policy_broker, router
 from ..router.classifier import BaselineClassifier, IntentClassifier
+from ..tools import ToolRequest, ToolResponse, default_tool_server
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,49 @@ def _pick_reset_target(state: TurnState) -> str | None:
     return (offline or devices)[0].device_id
 
 
+def _tool_result(response: ToolResponse) -> ToolResult:
+    return ToolResult(
+        ok=response.ok,
+        data=dict(response.data),
+        error=response.error.code if response.error else "",
+    )
+
+
+def _execute_boundary_tool(
+    state: TurnState,
+    *,
+    tool_name: str,
+    envelope_action: str,
+    target_resource: str,
+    args: dict,
+    policy: action_policy.ActionPolicy,
+) -> ToolResult:
+    assert state.access is not None and state.broker_decision is not None
+    envelope = ActionEnvelope.opened(
+        turn_id=state.turn_id,
+        customer_id=state.access.customer_id or "",
+        action=envelope_action,
+        target_resource=target_resource,
+        policy_handle=state.broker_decision.policy_handle,
+        blast_radius=policy.blast_radius.value,
+        reversibility=policy.reversibility.value,
+    )
+    request = ToolRequest(
+        tool_name=tool_name,
+        turn_id=state.turn_id,
+        caller=state.access.customer_id or "anonymous",
+        customer_id=state.access.customer_id or "",
+        target_resource=target_resource,
+        args=args,
+        context=state.access,
+        broker_decision=state.broker_decision,
+        envelope=envelope,
+    )
+    response = default_tool_server.execute(request)
+    state.action_envelopes.append(envelope)
+    return _tool_result(response)
+
+
 def run_tool(state: TurnState) -> TurnState:
     assert state.route is not None and state.access is not None
     action = state.route.tool
@@ -114,26 +157,30 @@ def run_tool(state: TurnState) -> TurnState:
         if target is None:
             state.tool_results.append(ToolResult(ok=False, error="no_device"))
         else:
-            # A device reset is a side-effecting external action: run it inside an
-            # action envelope so it is identified, authorised, and safe to retry.
-            ctx = state.access
+            # All tool execution crosses the v2.3 boundary: request -> registry
+            # -> scope/broker/envelope checks -> scoped handler -> audit event.
             policy = action_policy.policy_for(action_policy.ActionClass.DEVICE_RESET)
-            handle = state.broker_decision.policy_handle if state.broker_decision else ""
-            envelope, result = execute_action(
-                ctx,
-                turn_id=state.turn_id,
-                action="device_reset",
+            result = _execute_boundary_tool(
+                state,
+                tool_name="device.set_online_status",
+                envelope_action="device_reset",
                 target_resource=target,
-                policy_handle=handle,
-                blast_radius=policy.blast_radius.value,
-                reversibility=policy.reversibility.value,
-                tool=lambda: tools.device_reset(ctx, target),
+                args={"device_id": target, "online": True},
+                policy=policy,
             )
-            state.action_envelopes.append(envelope)
             state.tool_results.append(result)
     elif action == Action.ACCOUNT_LOOKUP:
-        # Read-only: no external side effect, so no action envelope.
-        state.tool_results.append(tools.account_lookup(state.access))
+        policy = action_policy.policy_for(action_policy.ActionClass.ACCOUNT_READ)
+        target = state.access.customer_id or ""
+        result = _execute_boundary_tool(
+            state,
+            tool_name="customer.lookup",
+            envelope_action="account_lookup",
+            target_resource=target,
+            args={},
+            policy=policy,
+        )
+        state.tool_results.append(result)
     return state
 
 

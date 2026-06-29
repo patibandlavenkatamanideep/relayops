@@ -25,7 +25,17 @@ REPLAYED = "replayed"  # idempotent hit — a prior success was returned, not re
 
 # Tool errors that mean "the server refused", not "the action failed". They map
 # to REFUSED so an operator can tell a permission/scope denial from a fault.
-_REFUSAL_ERRORS = frozenset({"not_authorized", "scope_violation"})
+_REFUSAL_ERRORS = frozenset(
+    {
+        "not_authorized",
+        "scope_violation",
+        "unauthenticated",
+        "customer_scope_mismatch",
+        "broker_denied",
+        "invalid_envelope",
+        "unknown_tool",
+    }
+)
 
 
 def _now() -> str:
