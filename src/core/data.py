@@ -1,13 +1,20 @@
-"""In-memory account/device store — the backing service the MCP server fronts.
+"""Account/device data — the backing service the MCP server fronts.
 
 Two customers exist so the slice can demonstrate the load-bearing security
 property: customer A can never reach customer B's device, even if the model is
 told to. In production this module is a real account/device microservice; the
 interface (lookup by id, scoped to an owner) stays the same.
+
+v2.0 moves the data itself behind a SQLite datastore (``CustomerStore``). The
+dicts below are now only the canonical *seed* — the live reads and the
+(reversible) device-state writes go through the store. The accessor functions
+keep their original signatures, so the gate, MCP server, and pipeline are
+unchanged: they still trust whatever the scoped store returns.
 """
 
 from __future__ import annotations
 
+from .customer_store import DEFAULT_DB_PATH, CustomerStore
 from .models import Customer, Device
 
 # token -> customer_id. Stands in for real authentication (session/JWT).
@@ -28,26 +35,44 @@ _DEVICES: dict[str, Device] = {
 }
 
 
+def _build_store() -> CustomerStore:
+    """The process-default store, seeded from the canonical fixture above.
+
+    For the in-memory default this seeds a fresh store every process (v1.x
+    semantics). For a durable ``RELAYOPS_CUSTOMER_DB`` it seeds only when empty,
+    so a previously applied device reset survives a restart.
+    """
+    s = CustomerStore(DEFAULT_DB_PATH)
+    if s.is_empty():
+        s.seed(customers=_CUSTOMERS, devices=_DEVICES, tokens=_TOKENS)
+    return s
+
+
+_STORE = _build_store()
+
+
+def store() -> CustomerStore:
+    """Return the process-default customer store (for inspection / CLI)."""
+    return _STORE
+
+
 def resolve_token(token: str | None) -> str | None:
     """Map an auth token to a customer_id, or None if invalid."""
-    if not token:
-        return None
-    return _TOKENS.get(token)
+    return _STORE.resolve_token(token)
 
 
 def get_customer(customer_id: str) -> Customer | None:
-    return _CUSTOMERS.get(customer_id)
+    return _STORE.get_customer(customer_id)
 
 
 def get_device(device_id: str) -> Device | None:
-    return _DEVICES.get(device_id)
+    return _STORE.get_device(device_id)
 
 
 def devices_for(customer_id: str) -> list[Device]:
-    return [d for d in _DEVICES.values() if d.owner_id == customer_id]
+    return _STORE.devices_for(customer_id)
 
 
 def set_device_online(device_id: str, online: bool) -> None:
     """Apply a (reversible) device state change. The reset uses this."""
-    d = _DEVICES[device_id]
-    _DEVICES[device_id] = Device(d.device_id, d.owner_id, d.name, online=online)
+    _STORE.set_device_online(device_id, online=online)
