@@ -35,9 +35,7 @@ def report_from_findings(findings: list[HermesReviewPacket]) -> HermesReport:
         suggested_policy_gaps=_dedup(
             f.suggested_policy_gap for f in findings if f.suggested_policy_gap
         ),
-        suggested_github_issues=[
-            _issue(f) for f in findings if f.severity in _ISSUE_SEVERITIES
-        ],
+        suggested_github_issues=[_issue(f) for f in findings if f.severity in _ISSUE_SEVERITIES],
         release_notes_draft=_release_notes(by_type),
     )
 

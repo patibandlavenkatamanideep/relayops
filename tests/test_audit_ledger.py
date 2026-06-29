@@ -82,17 +82,13 @@ class AuditLedgerBehaviourTests(unittest.TestCase):
         self.assertIn("billing_history", rec["unavailable_context"])
         self.assertIn("payment_method", rec["unavailable_context"])
         self.assertIn("prior_agent_promises", rec["unavailable_context"])
-        self.assertEqual(
-            rec["pre_action_intent_packet"]["requested_action"], "billing_refund"
-        )
+        self.assertEqual(rec["pre_action_intent_packet"]["requested_action"], "billing_refund")
         self.assertEqual(
             rec["pre_action_intent_packet"]["policy_handle"],
             "billing.refund.requires_human",
         )
         self.assertEqual(rec["broker_decision_packet"]["decision"], "escalate")
-        self.assertIn(
-            "promise_discount", rec["broker_decision_packet"]["forbidden_next_actions"]
-        )
+        self.assertIn("promise_discount", rec["broker_decision_packet"]["forbidden_next_actions"])
         self.assertEqual(
             rec["final_reply_packet"]["policy_handle"],
             rec["broker_decision_packet"]["policy_handle"],

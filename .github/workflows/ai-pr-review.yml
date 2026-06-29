@@ -42,6 +42,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+
       - name: Detect policy-sensitive changes
         id: detect
         shell: bash

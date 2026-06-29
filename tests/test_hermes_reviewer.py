@@ -24,7 +24,10 @@ def _record(**overrides) -> dict:
         "blast_radius": "low",
         "handoff_reason": None,
         "guardrail": {"checked": True, "verdict": "pass", "violations": []},
-        "broker_decision_packet": {"decision": "allow", "policy_handle": "faq.answer.requires_grounding"},
+        "broker_decision_packet": {
+            "decision": "allow",
+            "policy_handle": "faq.answer.requires_grounding",
+        },
     }
     base.update(overrides)
     return base
@@ -35,7 +38,9 @@ class HermesReviewerTests(unittest.TestCase):
         self.assertIsNone(review_record(_record()))
 
     def test_fail_closed_finding(self):
-        f = review_record(_record(route="human_escalation", handoff_reason="fail_closed:composer_timeout"))
+        f = review_record(
+            _record(route="human_escalation", handoff_reason="fail_closed:composer_timeout")
+        )
         self.assertIsNotNone(f)
         self.assertEqual(f.finding_type, "fail_closed")
         self.assertEqual(f.severity, "high")
@@ -48,8 +53,15 @@ class HermesReviewerTests(unittest.TestCase):
             _record(
                 route="human_escalation",
                 handoff_reason="guardrail_block",
-                guardrail={"checked": True, "verdict": "block", "violations": ["unapproved_discount"]},
-                broker_decision_packet={"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"},
+                guardrail={
+                    "checked": True,
+                    "verdict": "block",
+                    "violations": ["unapproved_discount"],
+                },
+                broker_decision_packet={
+                    "decision": "block",
+                    "policy_handle": "response.guardrail.offer_pii_tone",
+                },
             )
         )
         self.assertEqual(f.finding_type, "guardrail_block")
@@ -63,7 +75,9 @@ class HermesReviewerTests(unittest.TestCase):
         self.assertEqual(f.suggested_policy_gap, "faq.answer.requires_grounding")
 
     def test_unsafe_escape_is_critical(self):
-        f = review_record(_record(route="auto_action", action_class="billing_refund", blast_radius="high"))
+        f = review_record(
+            _record(route="auto_action", action_class="billing_refund", blast_radius="high")
+        )
         self.assertEqual(f.finding_type, "unsafe_escape")
         self.assertEqual(f.severity, "critical")
 
@@ -73,8 +87,12 @@ class HermesReviewerTests(unittest.TestCase):
             _record(
                 route="human_escalation",
                 handoff_reason="guardrail_block",
-                guardrail=json.dumps({"verdict": "block", "violations": ["unapproved_amount:$9.99"]}),
-                broker_decision_packet=json.dumps({"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"}),
+                guardrail=json.dumps(
+                    {"verdict": "block", "violations": ["unapproved_amount:$9.99"]}
+                ),
+                broker_decision_packet=json.dumps(
+                    {"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"}
+                ),
             )
         )
         self.assertEqual(f.finding_type, "guardrail_block")
@@ -132,7 +150,9 @@ class HermesStoreIntegrationTests(unittest.TestCase):
                 "action_class": "send_troubleshooting_link",
                 "blast_radius": "low",
                 "handoff_reason": "fail_closed:guardrail_unavailable",
-                "broker_decision_packet": json.dumps({"decision": "escalate", "policy_handle": "safety.fail_closed"}),
+                "broker_decision_packet": json.dumps(
+                    {"decision": "escalate", "policy_handle": "safety.fail_closed"}
+                ),
             }
         )
         store.write_row(
@@ -143,7 +163,9 @@ class HermesStoreIntegrationTests(unittest.TestCase):
                 "blast_radius": "low",
                 "handoff_reason": "guardrail_block",
                 "guardrail_verdict": "block",
-                "broker_decision_packet": json.dumps({"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"}),
+                "broker_decision_packet": json.dumps(
+                    {"decision": "block", "policy_handle": "response.guardrail.offer_pii_tone"}
+                ),
             }
         )
         store.write_row({"turn_id": "t_ok", "route": "respond", "blast_radius": "low"})
@@ -159,7 +181,16 @@ class HermesStoreIntegrationTests(unittest.TestCase):
 class HermesIsAdvisoryOnlyTests(unittest.TestCase):
     def test_no_execute_surface(self):
         # Hermes must not expose any action/execution API — it only reviews.
-        forbidden = ("execute", "send", "apply", "approve", "refund", "override", "run_tool", "compose")
+        forbidden = (
+            "execute",
+            "send",
+            "apply",
+            "approve",
+            "refund",
+            "override",
+            "run_tool",
+            "compose",
+        )
         names = [n.lower() for n in dir(hermes)]
         for bad in forbidden:
             self.assertFalse(
@@ -168,7 +199,9 @@ class HermesIsAdvisoryOnlyTests(unittest.TestCase):
             )
 
     def test_findings_default_to_human_review(self):
-        f = review_record(_record(route="human_escalation", handoff_reason="fail_closed:composer_timeout"))
+        f = review_record(
+            _record(route="human_escalation", handoff_reason="fail_closed:composer_timeout")
+        )
         self.assertTrue(f.human_review_required)
 
 

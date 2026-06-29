@@ -353,9 +353,7 @@ def handle_turn(
 
     if guard.blocked:
         # A hallucinated offer/price (or tone breach) is escalated to a human.
-        state.broker_decision = policy_broker.decision_from_guardrail_block(
-            state, guard.violations
-        )
+        state.broker_decision = policy_broker.decision_from_guardrail_block(state, guard.violations)
         response = _escalate(
             state,
             reason="guardrail_block",

@@ -42,7 +42,9 @@ def _main() -> None:
     m = report.metrics
     if m:
         print("\nSafety metrics:")
-        print(f"  unsafe_escape_rate       : {m['unsafe_escape_rate']}  ({m['unsafe_escape_count']})")
+        print(
+            f"  unsafe_escape_rate       : {m['unsafe_escape_rate']}  ({m['unsafe_escape_count']})"
+        )
         print(f"  over_block_rate          : {m['over_block_rate']}  ({m['over_block_count']})")
         print(f"  fail_closed_rate         : {m['fail_closed_rate']}  ({m['fail_closed_count']})")
         print(f"  guardrail_block_count    : {m['guardrail_block_count']}")
