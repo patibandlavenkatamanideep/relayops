@@ -173,8 +173,7 @@ _ENTRIES: tuple[PolicyHandle, ...] = (
         handle=GREETING,
         title="Greeting response allowed",
         description=(
-            "A greeting with no tool or retrieval is safe to answer directly "
-            "without escalating."
+            "A greeting with no tool or retrieval is safe to answer directly without escalating."
         ),
         owner="general_support",
         disposition="allow",

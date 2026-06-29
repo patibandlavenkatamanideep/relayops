@@ -111,8 +111,7 @@ async def post_turn(req: TurnRequest) -> TurnResponse:
         audit_record=record.to_dict(),
         trace=record.to_dict(),
         tool_results=[
-            ToolResultModel(ok=r.ok, data=r.data, error=r.error)
-            for r in response.tool_results
+            ToolResultModel(ok=r.ok, data=r.data, error=r.error) for r in response.tool_results
         ],
         handoff=response.handoff_context,
     )

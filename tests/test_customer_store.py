@@ -103,7 +103,9 @@ class DefaultStoreTests(unittest.TestCase):
 
         self.assertEqual(data.resolve_token("tok_alice"), "cust_alice")
         self.assertEqual(data.get_customer("cust_alice").name, "Alice")
-        self.assertEqual({d.device_id for d in data.devices_for("cust_alice")}, {"dev_a1", "dev_a2"})
+        self.assertEqual(
+            {d.device_id for d in data.devices_for("cust_alice")}, {"dev_a1", "dev_a2"}
+        )
 
 
 if __name__ == "__main__":

@@ -340,7 +340,9 @@ def _render_operator_tab() -> None:
     st.info(report.failure_summary)
 
     if not findings:
-        st.caption("Send messages in the Chat tab (e.g. the Billing scenario) to give Hermes traces to review.")
+        st.caption(
+            "Send messages in the Chat tab (e.g. the Billing scenario) to give Hermes traces to review."
+        )
         return
 
     st.markdown("**Findings**")

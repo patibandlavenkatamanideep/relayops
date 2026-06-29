@@ -326,9 +326,7 @@ def decision_from_unverifiable(state: TurnState) -> BrokerDecisionPacket:
     )
 
 
-def decision_from_guardrail_block(
-    state: TurnState, violations: list[str]
-) -> BrokerDecisionPacket:
+def decision_from_guardrail_block(state: TurnState, violations: list[str]) -> BrokerDecisionPacket:
     """Update the broker packet after final-text guardrail failure."""
 
     base_action = _action_from_state(state)
@@ -345,7 +343,11 @@ def decision_from_guardrail_block(
         owner=owner,
         human_queue=_queue_for(owner),
         allowed_next_actions=["explain_safe_handoff", "route_to_human"],
-        forbidden_next_actions=["send_blocked_candidate", "promise_discount", "quote_unapproved_price"],
+        forbidden_next_actions=[
+            "send_blocked_candidate",
+            "promise_discount",
+            "quote_unapproved_price",
+        ],
     )
 
 

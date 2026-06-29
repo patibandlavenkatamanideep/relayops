@@ -61,9 +61,7 @@ class ApiTurnTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(d["guardrail_result"]["verdict"], "not_reached")
             self.assertEqual(d["audit_record"]["turn_id"], d["turn_id"])
             self.assertEqual(d["trace"]["broker_decision_packet"]["decision"], "escalate")
-            self.assertEqual(
-                d["trace"]["final_reply_packet"]["source"], "broker_decision_packet"
-            )
+            self.assertEqual(d["trace"]["final_reply_packet"]["source"], "broker_decision_packet")
 
     async def test_turn_reset_works(self):
         async with _client() as c:
@@ -154,9 +152,7 @@ class ComposerDefaultTests(unittest.TestCase):
     """The public posture: the API must not reach for an LLM by default."""
 
     def setUp(self):
-        self._saved = {
-            k: os.environ.get(k) for k in ("RELAYOPS_COMPOSER", "RELAYOPS_ALLOW_LLM")
-        }
+        self._saved = {k: os.environ.get(k) for k in ("RELAYOPS_COMPOSER", "RELAYOPS_ALLOW_LLM")}
 
     def tearDown(self):
         for k, v in self._saved.items():
