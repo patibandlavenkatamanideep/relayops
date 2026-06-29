@@ -50,6 +50,22 @@ class TurnResponse(BaseModel):
     handoff: Optional[dict[str, Any]] = None
 
 
+class LoginRequest(BaseModel):
+    """Exchange an opaque access token for a signed bearer token.
+
+    ``token`` is the same authority the access gate already resolves; login only
+    wraps it in a short-lived signed envelope. It grants no new scope.
+    """
+
+    token: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class HealthResponse(BaseModel):
     ok: bool = True
 
