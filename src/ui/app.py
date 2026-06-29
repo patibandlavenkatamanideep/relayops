@@ -1,9 +1,11 @@
 """Streamlit UI for the RelayOps vertical slice.
 
-Three tabs:
-  * Chat            — drive the agent end to end.
+Tabs:
+  * Chat             — drive the agent end to end.
+  * Batch Run        — process a sample support queue.
   * Decision Console — live audit ledger, route mix, safety counters, exports.
   * Handoff Queue    — escalations rendered as actionable, owner-routed tickets.
+  * Operator Review  — read-only Hermes review of the audit trail (advisory).
 
 Run:
     streamlit run src/ui/app.py
@@ -11,6 +13,7 @@ Run:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -24,6 +27,8 @@ import streamlit as st  # noqa: E402
 
 from src.graph.pipeline import handle_turn  # noqa: E402
 from src.guardrails import guardrail  # noqa: E402
+from src.hermes import build_report  # noqa: E402
+from src.policy import registry as policy_registry  # noqa: E402
 from src.observability.audit_ledger import AuditLedger  # noqa: E402
 from src.observability.audit_store import AuditStore  # noqa: E402
 from src.router.registry import get_classifier  # noqa: E402
@@ -294,6 +299,103 @@ def _render_queue_tab() -> None:
                     st.rerun()
 
 
+# --- operator review (Hermes) --------------------------------------------------
+
+
+# Severity -> badge, ordered least to most urgent for stable, readable grouping.
+_SEVERITY_BADGE = {
+    "low": "⚪ low",
+    "medium": "🟡 medium",
+    "high": "🟠 high",
+    "critical": "🔴 critical",
+}
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def _render_operator_tab() -> None:
+    st.subheader("Operator Review — Hermes")
+    st.caption(
+        "The operator-side stage after the audit store: Hermes reads decision "
+        "traces and drafts findings, tests, policy gaps, issues, and release notes "
+        "for a human developer. Read-only and advisory — it never replies, executes "
+        "a tool, or changes policy."
+    )
+
+    records = _store().list(limit=200)
+    report = build_report(records)
+    findings = sorted(
+        report.findings, key=lambda f: (_SEVERITY_ORDER.get(f.severity, 99), f.turn_id)
+    )
+
+    by_severity: dict[str, int] = {}
+    for f in findings:
+        by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
+
+    row = st.columns(4)
+    row[0].metric("Turns reviewed", len(records))
+    row[1].metric("Findings", len(findings))
+    row[2].metric("Critical / high", by_severity.get("critical", 0) + by_severity.get("high", 0))
+    row[3].metric("Draft issues", len(report.suggested_github_issues))
+
+    st.info(report.failure_summary)
+
+    if not findings:
+        st.caption("Send messages in the Chat tab (e.g. the Billing scenario) to give Hermes traces to review.")
+        return
+
+    st.markdown("**Findings**")
+    for f in findings:
+        badge = _SEVERITY_BADGE.get(f.severity, f.severity)
+        with st.expander(f"{badge}  ·  {f.finding_type}  ·  {f.turn_id}", expanded=False):
+            st.write(
+                {
+                    "turn_id": f.turn_id,
+                    "severity": f.severity,
+                    "finding_type": f.finding_type,
+                    "summary": f.summary,
+                    "suggested_test": f.suggested_test or "—",
+                    "suggested_policy_gap": f.suggested_policy_gap or "—",
+                    "human_review_required": f.human_review_required,
+                }
+            )
+
+    cols = st.columns(2)
+    with cols[0]:
+        st.markdown("**Suggested tests**")
+        for t in report.suggested_tests:
+            st.markdown(f"- {t}")
+        if not report.suggested_tests:
+            st.write("—")
+    with cols[1]:
+        st.markdown("**Policy gaps to review**")
+        for g in report.suggested_policy_gaps:
+            entry = policy_registry.REGISTRY.get(g)
+            if entry is not None:
+                st.markdown(f"- `{g}` — {entry.title} (owner: {entry.owner})")
+            else:
+                st.markdown(f"- `{g}`")
+        if not report.suggested_policy_gaps:
+            st.write("—")
+
+    if report.suggested_github_issues:
+        st.markdown("**Draft GitHub issues (urgent findings)**")
+        for issue in report.suggested_github_issues:
+            with st.expander(issue["title"], expanded=False):
+                st.code(issue["body"], language="markdown")
+
+    st.markdown("**Release-notes draft**")
+    st.code(report.release_notes_draft, language="markdown")
+
+    st.download_button(
+        "Download operator report JSON",
+        data=json.dumps(report.to_dict(), indent=2),
+        file_name="relayops_operator_review.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    st.caption("Advisory only — every finding requires human developer review.")
+
+
 # --- batch run -----------------------------------------------------------------
 
 
@@ -407,8 +509,8 @@ def main() -> None:
                 _run_turn(text)
                 st.rerun()
 
-    chat_tab, batch_tab, console_tab, queue_tab = st.tabs(
-        ["Chat", "Batch Run", "Decision Console", "Handoff Queue"]
+    chat_tab, batch_tab, console_tab, queue_tab, operator_tab = st.tabs(
+        ["Chat", "Batch Run", "Decision Console", "Handoff Queue", "Operator Review"]
     )
     with chat_tab:
         _render_chat_tab()
@@ -418,6 +520,8 @@ def main() -> None:
         _render_console_tab()
     with queue_tab:
         _render_queue_tab()
+    with operator_tab:
+        _render_operator_tab()
 
 
 if __name__ == "__main__":

@@ -8,8 +8,9 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v1.8.1 working prototype** — FastAPI service layer, request-level audit,
-Pre-Action Intent Packets, Broker Decision Packets, live Streamlit demo, Decision
+Status: **v1.9 working prototype** — FastAPI service layer, request-level audit,
+Pre-Action Intent Packets, Broker Decision Packets, an enforced policy-handle
+registry, a read-only Hermes operator review, live Streamlit demo, Decision
 Console, Handoff Queue, support-ticket batch runner, public-dataset importers,
 Qwen LoRA evals, optional local LLM composer, and pinned Railway deployment.
 Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
@@ -482,7 +483,7 @@ is allowed to say.
 | v1.7 | optional LLM composer + public safety gate | shipped |
 | v1.8 | FastAPI service layer + request-level audit | shipped |
 | v1.8.1 | Pre-Action Intent Packet + Broker Decision Packet | shipped |
-| v1.9 | policy registry / policy handles | planned |
+| v1.9 | policy registry / policy handles | shipped |
 | v2.0 | datastore + SQLite customer/auth store | planned |
 | v2.1 | JWT auth + rate limiting | planned |
 | v2.2 | external action envelope | planned |
