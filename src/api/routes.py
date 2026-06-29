@@ -2,6 +2,7 @@
 
 Endpoints:
     GET  /healthz              liveness
+    POST /v1/auth/login       exchange an opaque token for a signed bearer token
     POST /v1/turn             run one support turn (returns a turn_id)
     GET  /v1/audit/{turn_id}  fetch the durable audit record for a turn
     GET  /v1/handoffs         recent human-escalation handoffs
@@ -11,6 +12,12 @@ Endpoints:
 Each turn is run through ``handle_turn`` (no reimplementation) with a
 request-scoped ``turn_id`` so the response, the audit row, and the logs share
 one id.
+
+Auth (v2.1) is an optional signed-bearer envelope: ``/v1/auth/login`` wraps an
+opaque access token in a short-lived HS256 token, and ``/v1/turn`` accepts it via
+``Authorization: Bearer``. The body ``token`` still works for backward compat.
+Either way the deterministic access gate remains the single authority for scope.
+A per-caller rate limit guards the turn endpoint.
 """
 
 from __future__ import annotations
@@ -20,15 +27,20 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 
+from ..access import gate
 from ..graph.pipeline import handle_turn
 from ..observability.audit_ledger import AuditLedger
 from ..observability.audit_store import DEFAULT_DB_PATH, AuditStore
+from . import auth
+from .ratelimit import RateLimiter
 from .schemas import (
     HandoffsResponse,
     HealthResponse,
+    LoginRequest,
+    LoginResponse,
     ToolResultModel,
     TurnRequest,
     TurnResponse,
@@ -37,6 +49,10 @@ from .schemas import (
 logger = logging.getLogger("relayops.api")
 
 router = APIRouter()
+
+# One per-process rate limiter for the turn endpoint. Module-level so it persists
+# across requests; a test can swap it for a tighter window.
+_limiter = RateLimiter()
 
 # One durable audit store per process, created lazily so a test can point
 # RELAYOPS_AUDIT_DB at a temp file before the first request.
@@ -71,8 +87,54 @@ async def healthz() -> HealthResponse:
     return HealthResponse(ok=True)
 
 
+@router.post("/v1/auth/login")
+async def login(req: LoginRequest) -> JSONResponse:
+    """Exchange an opaque access token for a short-lived signed bearer token.
+
+    The gate must already resolve the opaque token to a customer; login grants no
+    new scope, it only wraps the existing authority in a signed envelope.
+    """
+    ctx = gate.authenticate(req.token)
+    if not ctx.authenticated or ctx.customer_id is None:
+        return JSONResponse(status_code=401, content={"error": "invalid_token"})
+    access_token = auth.issue(ctx.customer_id, req.token)
+    body = LoginResponse(access_token=access_token, expires_in=auth.JWT_TTL)
+    return JSONResponse(status_code=200, content=body.model_dump())
+
+
+def _resolve_auth_token(req: TurnRequest, authorization: str | None) -> str | None:
+    """Pick the opaque access token for the turn.
+
+    A valid ``Authorization: Bearer`` token wins (its ``tok`` claim is the
+    authority); otherwise fall back to the request body ``token``. Raises
+    ``auth.AuthError`` if a bearer token is present but invalid/expired — the
+    caller turns that into a 401 rather than silently downgrading.
+    """
+    bearer = auth.bearer_from_header(authorization)
+    if bearer is not None:
+        claims = auth.verify(bearer)  # raises AuthError on bad/expired
+        return claims["tok"]
+    return req.token
+
+
 @router.post("/v1/turn", response_model=TurnResponse)
-async def post_turn(req: TurnRequest) -> TurnResponse:
+async def post_turn(req: TurnRequest, authorization: str | None = Header(default=None)) -> TurnResponse:
+    try:
+        auth_token = _resolve_auth_token(req, authorization)
+    except auth.AuthError as exc:
+        return JSONResponse(status_code=401, content={"error": f"unauthorized: {exc}"})
+
+    # Per-caller rate limit: keyed by the resolved token (or "anon" when none),
+    # so one client can't flood the turn endpoint.
+    rate_key = auth_token or "anon"
+    if not _limiter.allow(rate_key):
+        retry = _limiter.retry_after(rate_key)
+        return JSONResponse(
+            status_code=429,
+            content={"error": "rate_limited", "retry_after": retry},
+            headers={"Retry-After": str(retry)},
+        )
+
     turn_id = _make_turn_id()
 
     # Capture the per-turn decision trail and persist it durably, exactly as the
@@ -80,7 +142,7 @@ async def post_turn(req: TurnRequest) -> TurnResponse:
     ledger = AuditLedger()
     response = handle_turn(
         req.message,
-        auth_token=req.token,
+        auth_token=auth_token,
         device_id=req.device_id,
         audit=ledger,
         turn_id=turn_id,
