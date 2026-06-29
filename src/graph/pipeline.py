@@ -22,6 +22,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from ..access import gate
+from ..actions import execute_action
 from ..core import data
 from ..core.models import (
     Action,
@@ -113,8 +114,25 @@ def run_tool(state: TurnState) -> TurnState:
         if target is None:
             state.tool_results.append(ToolResult(ok=False, error="no_device"))
         else:
-            state.tool_results.append(tools.device_reset(state.access, target))
+            # A device reset is a side-effecting external action: run it inside an
+            # action envelope so it is identified, authorised, and safe to retry.
+            ctx = state.access
+            policy = action_policy.policy_for(action_policy.ActionClass.DEVICE_RESET)
+            handle = state.broker_decision.policy_handle if state.broker_decision else ""
+            envelope, result = execute_action(
+                ctx,
+                turn_id=state.turn_id,
+                action="device_reset",
+                target_resource=target,
+                policy_handle=handle,
+                blast_radius=policy.blast_radius.value,
+                reversibility=policy.reversibility.value,
+                tool=lambda: tools.device_reset(ctx, target),
+            )
+            state.action_envelopes.append(envelope)
+            state.tool_results.append(result)
     elif action == Action.ACCOUNT_LOOKUP:
+        # Read-only: no external side effect, so no action envelope.
         state.tool_results.append(tools.account_lookup(state.access))
     return state
 
@@ -217,6 +235,7 @@ def _escalate(
         handoff_context=handoff,
         guardrail_action=guardrail_action,
         guardrail_violations=list(guardrail_violations or []),
+        action_envelopes=[e.to_dict() for e in state.action_envelopes],
     )
 
 
@@ -241,6 +260,7 @@ def _respond(state: TurnState, text: str, guard: guardrail.GuardrailResult) -> A
         guardrail_action=guard.action,
         guardrail_violations=guard.violations,
         citations=citations,
+        action_envelopes=[e.to_dict() for e in state.action_envelopes],
     )
 
 

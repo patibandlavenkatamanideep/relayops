@@ -48,6 +48,7 @@ class AuditLedgerSchemaTests(unittest.TestCase):
         "risk_signal",
         "available_context",
         "unavailable_context",
+        "action_envelopes",
     }
 
     def test_record_has_full_schema(self):
