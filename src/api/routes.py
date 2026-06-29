@@ -5,6 +5,8 @@ Endpoints:
     POST /v1/turn             run one support turn (returns a turn_id)
     GET  /v1/audit/{turn_id}  fetch the durable audit record for a turn
     GET  /v1/handoffs         recent human-escalation handoffs
+    GET  /v1/operator/review  read-only Hermes review over recent audit traces
+    GET  /v1/policy/registry  the policy-handle catalog the broker decides from
 
 Each turn is run through ``handle_turn`` (no reimplementation) with a
 request-scoped ``turn_id`` so the response, the audit row, and the logs share
@@ -141,3 +143,20 @@ async def operator_review(limit: int = 100) -> JSONResponse:
 
     report = build_report(get_store().list(limit=limit))
     return JSONResponse(status_code=200, content=report.to_dict())
+
+
+@router.get("/v1/policy/registry")
+async def policy_registry_catalog() -> JSONResponse:
+    """The policy-handle catalog the broker stamps onto every decision.
+
+    Read-only reference: each entry carries the handle, title, rationale, owning
+    team, headline disposition, blast radius, and the matched rules that resolve
+    to it. Static policy data — no audit traces, no customer data — see
+    ``src/policy``.
+    """
+    from ..policy import registry
+
+    return JSONResponse(
+        status_code=200,
+        content={"policy_version": registry.POLICY_VERSION, "handles": registry.registry_as_list()},
+    )

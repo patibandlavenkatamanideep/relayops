@@ -136,6 +136,19 @@ class ApiTurnTests(unittest.IsolatedAsyncioTestCase):
             ids = [row["turn_id"] for row in h.json()["handoffs"]]
             self.assertIn(d["turn_id"], ids)
 
+    async def test_policy_registry_endpoint(self):
+        async with _client() as c:
+            r = await c.get("/v1/policy/registry")
+            self.assertEqual(r.status_code, 200)
+            body = r.json()
+            self.assertTrue(body["policy_version"])
+            handles = {h["handle"] for h in body["handles"]}
+            # A money-touching handle the broker emits must be in the catalog.
+            self.assertIn("billing.refund.requires_human", handles)
+            # Every entry carries the human-facing fields the catalog promises.
+            for entry in body["handles"]:
+                self.assertTrue(entry["title"] and entry["owner"] and entry["rules"])
+
 
 class ComposerDefaultTests(unittest.TestCase):
     """The public posture: the API must not reach for an LLM by default."""

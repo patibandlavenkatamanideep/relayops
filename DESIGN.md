@@ -83,6 +83,12 @@ a vertical slice that proves the load-bearing ideas."*
   decision: policy version, matched rule, reason code, missing evidence, owner,
   allowed next actions, and forbidden next actions. This packet is the source of
   truth for final response generation.
+- **Policy handle / policy registry (v1.9)** — the stable identifier the broker
+  stamps onto every decision (`policy_handle`). The registry (`src/policy`) is the
+  single catalog of those handles — title, rationale, owner, headline disposition,
+  blast radius, and the matched rules that resolve to each — and is *enforced*:
+  tests drive the broker over representative turns and fail if it emits a handle
+  the registry does not define, so no undocumented policy can ship.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.

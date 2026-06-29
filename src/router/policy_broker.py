@@ -21,9 +21,11 @@ from ..core.models import (
     PreActionIntentPacket,
     TurnState,
 )
+from ..policy import registry as policy_registry
 from . import action_policy
 
-POLICY_VERSION = "relayops_policy_v1"
+# Sourced from the policy registry so the version string lives in one place.
+POLICY_VERSION = policy_registry.POLICY_VERSION
 
 # Reason codes for the fail-closed invariant: if a safety-critical layer cannot
 # render a verdict, RelayOps must fail closed (escalate / hand off) — never
@@ -41,18 +43,21 @@ FAIL_CLOSED_REASONS = frozenset(
 )
 
 _GREETING_ACTION = "greeting_response"
-_GREETING_POLICY_HANDLE = "conversation.greeting.respond_allowed"
+_GREETING_POLICY_HANDLE = policy_registry.GREETING
 _GREETING_RULE = "safe_greeting_response_allowed"
 
 
+# Action class -> the policy handle that governs it. Handle ids come from the
+# registry (single source of truth); matched_rule strings stay local because a
+# handle pairs with different rules across decision paths.
 _POLICY_HANDLES = {
-    action_policy.ActionClass.DEVICE_RESET: "device.reset.allowed_if_scoped",
-    action_policy.ActionClass.SEND_TROUBLESHOOTING_LINK: "faq.answer.requires_grounding",
-    action_policy.ActionClass.ACCOUNT_READ: "account.status.requires_authenticated_scope",
-    action_policy.ActionClass.BILLING_REFUND: "billing.refund.requires_human",
-    action_policy.ActionClass.PLAN_CHANGE: "billing.plan_change.requires_human",
-    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: "account.change.requires_verification",
-    action_policy.ActionClass.UNKNOWN: "support.unknown.requires_human",
+    action_policy.ActionClass.DEVICE_RESET: policy_registry.DEVICE_RESET,
+    action_policy.ActionClass.SEND_TROUBLESHOOTING_LINK: policy_registry.FAQ_ANSWER,
+    action_policy.ActionClass.ACCOUNT_READ: policy_registry.ACCOUNT_STATUS,
+    action_policy.ActionClass.BILLING_REFUND: policy_registry.BILLING_REFUND,
+    action_policy.ActionClass.PLAN_CHANGE: policy_registry.BILLING_PLAN_CHANGE,
+    action_policy.ActionClass.ACCOUNT_ACCESS_CHANGE: policy_registry.ACCOUNT_CHANGE,
+    action_policy.ActionClass.UNKNOWN: policy_registry.SUPPORT_UNKNOWN,
 }
 
 _MATCHED_RULES = {
@@ -207,7 +212,7 @@ def decide_pre_action(state: TurnState) -> BrokerDecisionPacket:
             turn_id=state.turn_id,
             decision="escalate",
             policy_version=POLICY_VERSION,
-            policy_handle="auth.customer_scope.required",
+            policy_handle=policy_registry.AUTH_SCOPE,
             matched_rule="authenticated_customer_scope_required_before_action",
             reason_code="unauthenticated",
             missing_evidence=["authenticated_customer_scope"],
@@ -333,7 +338,7 @@ def decision_from_guardrail_block(
         turn_id=state.turn_id,
         decision="block",
         policy_version=POLICY_VERSION,
-        policy_handle="response.guardrail.offer_pii_tone",
+        policy_handle=policy_registry.GUARDRAIL,
         matched_rule="final_reply_guardrail_failed",
         reason_code="guardrail_block",
         missing_evidence=violations,
@@ -359,7 +364,7 @@ def decision_from_fail_closed(
         turn_id=state.turn_id,
         decision="escalate",
         policy_version=POLICY_VERSION,
-        policy_handle="safety.fail_closed",
+        policy_handle=policy_registry.FAIL_CLOSED,
         matched_rule="safety_layer_unavailable_fail_closed",
         reason_code=reason_code,
         missing_evidence=[f"verdict_from:{stage}"],
@@ -432,7 +437,7 @@ def compose_escalation_reply(decision: BrokerDecisionPacket | None) -> str:
             "I can't send an unverified offer, price, or account claim. I'll "
             "connect you with a specialist who can review this safely."
         )
-    if handle == "safety.fail_closed" or reason in FAIL_CLOSED_REASONS:
+    if handle == policy_registry.FAIL_CLOSED or reason in FAIL_CLOSED_REASONS:
         return (
             "I can't complete this safely right now, so I'm routing you to a "
             "specialist who can review and follow up with the full context."
