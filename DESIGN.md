@@ -96,6 +96,15 @@ a vertical slice that proves the load-bearing ideas."*
   ledger replays a previously succeeded action instead of running it twice — the
   safe-retry boundary for actions that reach an external system. The envelope is
   recorded on the turn response and the audit trail.
+- **Replay verification (v2.4)** — a deterministic, read-only check (`src/replay`)
+  that compares a prior audited flow against its replay and reports mismatches:
+  broker-decision drift, action-envelope drift, tool-response drift, missing
+  audit records, customer/caller scope drift, and double-execution risk (a replay
+  that re-ran an idempotent action instead of replaying it). Each mismatch carries
+  a stable reason code and severity; scope and double-execution mismatches are
+  safety-blocking. Replay metrics (`replay_success_rate`, mismatch / blocked /
+  missing-audit counts) and Hermes findings make drift visible to a human. It
+  never re-runs a tool or changes policy — the broker stays the authority.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.

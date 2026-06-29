@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from .metrics import SafetyMetrics, safety_metrics
 from .models import HermesReport, HermesReviewPacket
+from .replay_review import review_replay_result, review_replay_results
 from .report import build_report, report_from_findings
 from .reviewer import review, review_record
 
@@ -22,6 +23,8 @@ __all__ = [
     "safety_metrics",
     "review",
     "review_record",
+    "review_replay_result",
+    "review_replay_results",
     "build_report",
     "report_from_findings",
 ]
