@@ -42,14 +42,24 @@ class EnvelopeModelTests(unittest.TestCase):
 
     def test_refusal_vs_failure(self):
         e = ActionEnvelope.opened(
-            turn_id="t", customer_id="c", action="device_reset", target_resource="d",
-            policy_handle="h", blast_radius="low", reversibility="yes",
+            turn_id="t",
+            customer_id="c",
+            action="device_reset",
+            target_resource="d",
+            policy_handle="h",
+            blast_radius="low",
+            reversibility="yes",
         )
         e.fail("scope_violation")
         self.assertEqual(e.status, REFUSED)
         e2 = ActionEnvelope.opened(
-            turn_id="t", customer_id="c", action="device_reset", target_resource="d",
-            policy_handle="h", blast_radius="low", reversibility="yes",
+            turn_id="t",
+            customer_id="c",
+            action="device_reset",
+            target_resource="d",
+            policy_handle="h",
+            blast_radius="low",
+            reversibility="yes",
         )
         e2.fail("not_found")
         self.assertEqual(e2.status, "failed")
