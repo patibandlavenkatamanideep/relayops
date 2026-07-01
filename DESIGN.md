@@ -122,6 +122,21 @@ a vertical slice that proves the load-bearing ideas."*
   flag exits non-zero on a critical breach (a CI gate over audit evidence). Both
   layers are read-only and NON-authoritative: every alert carries
   `human_review_required=True`; Hermes never throttles, pages, changes policy, or acts.
+- **Redacted ticket import & design-partner report (v2.6)** — a deterministic,
+  local, read-only intake for evaluating a small **redacted / synthetic** sample of
+  a design partner's support tickets, with no vendor integration, credential, real
+  PII, or external execution. **Import** (`src/importers/`) parses CSV/JSONL,
+  validates required fields, normalizes sensitivity to `low/medium/high/restricted`,
+  drops any non-schema column (so a stray secret is never loaded), and returns
+  accepted `TicketRecord`s plus a per-row skip summary with deterministic reasons.
+  **Report** (`src/reports/`) reduces the import into a design-partner summary
+  (intake totals, category breakdown, automation vs. handoff estimates,
+  unsafe/sensitive cases, missing policy/tool candidates, suggested automations and
+  policy handles, human-review cases, replay-readiness notes) rendered to Markdown
+  and a JSON dict. Classifications are a deterministic estimate over category +
+  sensitivity, explicitly not the live broker decision. Hermes may *reference* the
+  report's gaps as advisory findings but never imports a file, executes an action,
+  or mutates a record — the human/operator stays accountable.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
