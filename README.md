@@ -8,13 +8,14 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v2.5 working prototype** — FastAPI service layer with signed bearer-token
+Status: **v2.6 working prototype** — FastAPI service layer with signed bearer-token
 auth and per-caller rate limiting, request-level audit, Pre-Action Intent Packets,
 Broker Decision Packets, an enforced policy-handle registry, an MCP-style
 tool-server boundary, external action envelopes with idempotent replay, replay
 verification over audit traces, a SQLite customer/auth datastore, a read-only
 Hermes operator review, an operator metrics dashboard (resolution / handoff /
-safety / replay / efficiency) with thresholded Hermes breach alerting, live
+safety / replay / efficiency) with thresholded Hermes breach alerting, a redacted
+ticket import + design-partner report workflow, live
 Streamlit demo, Decision Console, Handoff Queue,
 support-ticket batch runner, public-dataset importers, Qwen LoRA evals, optional
 local LLM composer, and pinned Railway deployment.
@@ -546,6 +547,40 @@ python3 -m src.hermes --strict   # non-zero exit on a critical breach (CI gate)
 python3 -m src.hermes --json     # full report incl. metrics + alerts as JSON
 ```
 
+## Redacted ticket import & design-partner report (v2.6)
+
+v2.6 makes the "[Looking for design partners](#looking-for-design-partners)" offer
+concrete. It adds a **deterministic, local, read-only** workflow to evaluate a
+small **redacted / synthetic** sample of a partner's support tickets — no vendor
+integration, no credentials, no real customer PII, and no external execution.
+
+**Import** (`src/importers/`) reads CSV or JSONL, validates and normalizes each row
+into a `TicketRecord`, and returns the accepted records plus a per-row skip
+summary. Required fields are `ticket_id`, `customer_id`, `message`, `category`,
+`expected_resolution`, `sensitivity_level` (optional: `created_at`, `channel`,
+`priority`, `historical_outcome`). Missing required fields, empty messages, and
+unknown sensitivity levels are skipped with a deterministic reason; sensitivity is
+normalized to `low / medium / high / restricted`. Only known schema fields are read
+off a row, so a stray secret column in an export is never imported.
+
+**Report** (`src/reports/`) reduces an import into a design-partner summary:
+intake totals, skipped reasons, category breakdown, automation vs. handoff
+estimates, unsafe/sensitive cases, missing policy/tool candidates, suggested
+automations and policy handles, suggested human-review cases, and replay-readiness
+notes. It renders to Markdown and to a JSON-compatible dict. Classifications are a
+deterministic estimate over category + sensitivity — a conversation starter, not
+the live broker decision. Hermes may *reference* the report's gaps as advisory
+findings (`to_hermes_findings`); it never imports a file, executes an action, or
+mutates a record.
+
+```bash
+python3 -m src.importers.ticket_importer examples/redacted_tickets.csv
+python3 -m src.reports.design_partner_report examples/redacted_tickets.jsonl
+python3 -m src.reports.design_partner_report examples/redacted_tickets.csv --json
+```
+
+Sample data in [examples/](examples/) is **synthetic and redacted** only.
+
 ## Roadmap
 
 | Version | Theme | Status |
@@ -568,6 +603,7 @@ python3 -m src.hermes --json     # full report incl. metrics + alerts as JSON
 | v2.3 | MCP-style tool-server boundary | shipped |
 | v2.4 | replay verification + audit consistency | shipped |
 | v2.5 | operator metrics dashboard with Hermes alerting | shipped |
+| v2.6 | redacted ticket import + design-partner report | shipped |
 
 ## Limitations
 

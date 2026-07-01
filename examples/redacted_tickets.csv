@@ -1,0 +1,11 @@
+ticket_id,customer_id,message,category,expected_resolution,sensitivity_level,created_at,channel,priority
+RT-001,cust_001,"my router is offline, can you reset it?",device_reset,device reset resolves the outage,low,2026-06-01,chat,normal
+RT-002,cust_002,"is my gateway online right now?",device_status,report current device status,low,2026-06-01,chat,low
+RT-003,cust_003,"how long does a device reset usually take?",faq,answer from knowledge base with citation,low,2026-06-02,email,low
+RT-004,cust_004,"hi there, thanks for the help earlier",greeting,friendly acknowledgement,none,2026-06-02,chat,low
+RT-005,cust_005,"I want a refund on last month's bill",refund,escalate to billing support,high,2026-06-03,chat,high
+RT-006,cust_006,"please reset my account password, I'm locked out",password_reset,verify identity then escalate to security,restricted,2026-06-03,phone,high
+RT-007,cust_007,"can you upgrade me to the premium plan?",plan_change,escalate to billing for plan change,high,2026-06-04,chat,normal
+RT-008,cust_008,"reboot the modem, nothing loads",reset_device,scoped device reset,low,2026-06-04,chat,normal
+RT-009,cust_009,"how do I enable international roaming in Antarctica?",roaming,"no grounded answer, escalate",medium,2026-06-05,email,low
+RT-010,cust_010,"restart my router but it holds sensitive medical account notes",device_reset,reset but treat as sensitive,high,2026-06-05,chat,high
