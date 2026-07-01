@@ -105,6 +105,23 @@ a vertical slice that proves the load-bearing ideas."*
   safety-blocking. Replay metrics (`replay_success_rate`, mismatch / blocked /
   missing-audit counts) and Hermes findings make drift visible to a human. It
   never re-runs a tool or changes policy — the broker stays the authority.
+- **Operator metrics dashboard with Hermes alerting (v2.5)** — two layers on top
+  of the read-only audit/replay evidence. **Operator metrics**
+  (`src/operator_metrics/`) reduce the records into the deterministic scoreboard a
+  human runs the system by: `resolution_rate`, `handoff_rate`, `fail_closed_rate`,
+  `unsafe_escape_rate`, `over_block_rate`, `replay_success_rate` /
+  `replay_mismatch_rate`, `action_execution_rate`, `avg_turns_to_resolution`, and
+  an illustrative `estimated_cost_per_resolved_ticket`. Each is a pure function of
+  the records; computing a metric never replies, executes a tool, or changes
+  policy. **Hermes alerting** (`src/hermes/alerting.py`) compares that combined
+  metrics snapshot against named operator thresholds (`AlertThresholds`) and raises
+  a deterministic `AlertPacket` for every breach: `unsafe_escape_rate` /
+  `replay_blocked_count` above 0 are critical; replay drift, fail-closed,
+  handoff-rate, and handoff-completeness shortfalls are high; over-block is medium.
+  High/critical breaches draft a GitHub issue and the operator CLI's `--strict`
+  flag exits non-zero on a critical breach (a CI gate over audit evidence). Both
+  layers are read-only and NON-authoritative: every alert carries
+  `human_review_required=True`; Hermes never throttles, pages, changes policy, or acts.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
