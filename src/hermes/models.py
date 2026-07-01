@@ -44,6 +44,10 @@ class HermesReport:
     # Split safety metrics (see hermes.metrics.safety_metrics). Stored as a plain
     # dict so ``models`` need not import ``metrics`` (avoids a circular import).
     metrics: dict[str, Any] = field(default_factory=dict)
+    # Operator dashboard metrics (see src.operator_metrics). Read-only scoreboard
+    # (resolution / handoff / safety / replay / efficiency) carried alongside the
+    # safety metrics. Stored as a plain dict for the same reason as ``metrics``.
+    operator_metrics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

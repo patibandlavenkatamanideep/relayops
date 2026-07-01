@@ -9,8 +9,9 @@ not open issues, change policy, or ship notes on its own.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Iterable
+from typing import Any, Iterable, Optional
 
+from ..operator_metrics import operator_metrics
 from .metrics import safety_metrics
 from .models import HermesReport, HermesReviewPacket
 from .reviewer import review
@@ -19,10 +20,20 @@ from .reviewer import review
 _ISSUE_SEVERITIES = ("high", "critical")
 
 
-def build_report(records: list[dict]) -> HermesReport:
-    """Review audit records and assemble the operator report (incl. metrics)."""
+def build_report(
+    records: list[dict], replay_metrics: Optional[dict[str, Any]] = None
+) -> HermesReport:
+    """Review audit records and assemble the operator report.
+
+    Carries both the split safety metrics and the v2.5 operator dashboard metrics
+    (resolution / handoff / safety / replay / efficiency). Optional
+    ``replay_metrics`` (from ``src.replay.verifier.replay_metrics``) feed the
+    replay rates on the operator scoreboard; omitted on the audit-store path,
+    which carries no replay results. Read-only — it reviews, it never acts.
+    """
     report = report_from_findings(review(records))
     report.metrics = safety_metrics(records).to_dict()
+    report.operator_metrics = operator_metrics(records, replay_metrics).to_dict()
     return report
 
 

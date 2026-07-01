@@ -8,12 +8,14 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v2.4 working prototype** — FastAPI service layer with signed bearer-token
+Status: **v2.5 working prototype** — FastAPI service layer with signed bearer-token
 auth and per-caller rate limiting, request-level audit, Pre-Action Intent Packets,
 Broker Decision Packets, an enforced policy-handle registry, an MCP-style
 tool-server boundary, external action envelopes with idempotent replay, replay
 verification over audit traces, a SQLite customer/auth datastore, a read-only
-Hermes operator review, live Streamlit demo, Decision Console, Handoff Queue,
+Hermes operator review, an operator metrics dashboard (resolution / handoff /
+safety / replay / efficiency) with thresholded Hermes breach alerting, live
+Streamlit demo, Decision Console, Handoff Queue,
 support-ticket batch runner, public-dataset importers, Qwen LoRA evals, optional
 local LLM composer, and pinned Railway deployment.
 Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
@@ -492,6 +494,58 @@ scope mismatches, and inconsistent tool results. Replay metrics
 findings surface the results for a human; Hermes stays advisory and never
 executes a replay.
 
+## Operator metrics dashboard with Hermes alerting (v2.5)
+
+v2.4 made the safety and replay scoreboards *visible*; v2.5 turns them into an
+**operator metrics dashboard** and makes breaches *loud*.
+
+**Operator metrics** (`src/operator_metrics/`) reduce the read-only audit and
+replay evidence into the deterministic numbers a human runs the system by — and
+nothing else: computing or reading a metric never replies, executes a tool, or
+changes policy. Each is a pure function of the records it is given:
+
+| Metric | Meaning |
+|---|---|
+| `resolution_rate` | turns the agent resolved without a human |
+| `handoff_rate` | turns escalated to a human |
+| `fail_closed_rate` | turns a safety layer couldn't render a verdict |
+| `unsafe_escape_rate` | high-blast actions that auto-executed (must be 0) |
+| `over_block_rate` | safe requests escalated for lack of grounding |
+| `replay_success_rate` / `replay_mismatch_rate` | replay health (v2.4 evidence) |
+| `action_execution_rate` | turns that executed a side-effecting action |
+| `avg_turns_to_resolution` | turns of work per resolved ticket |
+| `estimated_cost_per_resolved_ticket` | illustrative cost (fixed cost-per-turn) |
+
+The Operator Review tab renders these as Safety, Replay, Resolution, Handoff, and
+Efficiency summaries; the Hermes report and CLI carry them alongside the safety
+metrics.
+
+**Hermes alerting** (`src/hermes/alerting.py`) is the loud half: it compares the
+combined metrics snapshot against named operator thresholds and raises a
+deterministic `AlertPacket` for every breach:
+
+- **`unsafe_escape_rate` > 0** — a high-blast action auto-executed (critical);
+- **`replay_blocked_count` > 0** — a replay blocked on scope / double-execution (critical);
+- **`fail_closed_rate`** above budget — a safety layer couldn't render a verdict (high);
+- **`replay_success_rate`** below budget — replay drift past the operator budget (high);
+- **`handoff_completeness_score`** below budget — escalations handed off incomplete (high);
+- **`handoff_rate`** above budget — too many turns escalating instead of resolving (high);
+- **`over_block_rate`** above budget — safe requests escalated for grounding (medium).
+
+Thresholds (`AlertThresholds`) are strict by default and overridable per
+environment. High/critical breaches also draft a GitHub issue, and the operator
+CLI gains a `--strict` flag that exits non-zero on any critical breach — a CI gate
+over audit evidence. Both the metrics and the alerting stay read-only and
+**non-authoritative**: every `AlertPacket` carries `human_review_required=True`,
+and Hermes never throttles traffic, pages, changes policy, or acts — it raises the
+flag, a human decides.
+
+```bash
+python3 -m src.hermes            # operator review + metrics + alerts over recent turns
+python3 -m src.hermes --strict   # non-zero exit on a critical breach (CI gate)
+python3 -m src.hermes --json     # full report incl. metrics + alerts as JSON
+```
+
 ## Roadmap
 
 | Version | Theme | Status |
@@ -513,6 +567,7 @@ executes a replay.
 | v2.2 | external action envelope | shipped |
 | v2.3 | MCP-style tool-server boundary | shipped |
 | v2.4 | replay verification + audit consistency | shipped |
+| v2.5 | operator metrics dashboard with Hermes alerting | shipped |
 
 ## Limitations
 

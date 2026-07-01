@@ -27,7 +27,7 @@ import streamlit as st  # noqa: E402
 
 from src.graph.pipeline import handle_turn  # noqa: E402
 from src.guardrails import guardrail  # noqa: E402
-from src.hermes import build_report  # noqa: E402
+from src.hermes import build_alert_report, build_report  # noqa: E402
 from src.policy import registry as policy_registry  # noqa: E402
 from src.observability.audit_ledger import AuditLedger  # noqa: E402
 from src.observability.audit_store import AuditStore  # noqa: E402
@@ -312,6 +312,76 @@ _SEVERITY_BADGE = {
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
+def _fmt_rate(value) -> str:
+    """A rate as a percent, or 'n/a' for an unscored (None) metric."""
+    return "n/a" if value is None else f"{value:.1%}"
+
+
+def _render_operator_metrics(om: dict, safety: dict) -> None:
+    """The operator dashboard scoreboard: safety, replay, resolution, handoff,
+    and efficiency summaries. Read-only — these are computed from audit evidence
+    and never change anything."""
+    if not om:
+        return
+
+    st.markdown("**Safety Summary**")
+    s = st.columns(4)
+    s[0].metric("Unsafe escape", _fmt_rate(om["unsafe_escape_rate"]))
+    s[1].metric("Fail-closed", _fmt_rate(om["fail_closed_rate"]))
+    s[2].metric("Over-block", _fmt_rate(om["over_block_rate"]))
+    s[3].metric("Guardrail blocks", safety.get("guardrail_block_count", 0))
+
+    st.markdown("**Replay Summary**")
+    r = st.columns(2)
+    r[0].metric("Replay success", _fmt_rate(om["replay_success_rate"]))
+    r[1].metric("Replay mismatch", _fmt_rate(om["replay_mismatch_rate"]))
+    if om["replay_success_rate"] is None:
+        st.caption("No replay evidence in this audit window — replay rates are n/a.")
+
+    st.markdown("**Resolution Summary**")
+    res = st.columns(3)
+    res[0].metric("Resolution rate", _fmt_rate(om["resolution_rate"]))
+    res[1].metric("Resolved turns", om["resolved_count"])
+    res[2].metric("Action execution", _fmt_rate(om["action_execution_rate"]))
+
+    st.markdown("**Handoff Summary**")
+    h = st.columns(3)
+    h[0].metric("Handoff rate", _fmt_rate(om["handoff_rate"]))
+    h[1].metric("Handoffs", om["handoff_count"])
+    completeness = safety.get("handoff_completeness_score")
+    h[2].metric("Handoff completeness", _fmt_rate(completeness))
+
+    st.markdown("**Efficiency Summary**")
+    e = st.columns(2)
+    e[0].metric("Avg turns / resolution", f"{om['avg_turns_to_resolution']:.2f}")
+    e[1].metric("Est. cost / resolved", f"${om['estimated_cost_per_resolved_ticket']:.2f}")
+    st.caption(
+        "Efficiency figures are illustrative (a fixed cost-per-turn assumption), not "
+        "a measured spend."
+    )
+
+
+def _render_operator_alerts(alerts) -> None:
+    """Suggested Fixes / Alerts: thresholded breaches Hermes raised from the
+    metrics. Advisory only — every alert flags a metric for a human."""
+    st.markdown("**Suggested Fixes / Alerts**")
+    if not alerts.breached:
+        st.success(alerts.summary)
+        return
+
+    banner = st.error if alerts.has_critical else st.warning
+    banner(alerts.summary)
+    for a in alerts.alerts:
+        badge = _SEVERITY_BADGE.get(a.severity, a.severity)
+        bound = "≤" if a.comparison == "max" else "≥"
+        st.markdown(
+            f"- {badge}  ·  `{a.metric}` = {a.observed} (budget {bound} {a.threshold}) — {a.summary}"
+        )
+    st.caption(
+        "Advisory only — Hermes raised these from audit evidence; a human decides any response."
+    )
+
+
 def _render_operator_tab() -> None:
     st.subheader("Operator Review — Hermes")
     st.caption(
@@ -323,6 +393,7 @@ def _render_operator_tab() -> None:
 
     records = _store().list(limit=200)
     report = build_report(records)
+    alerts = build_alert_report(records)
     findings = sorted(
         report.findings, key=lambda f: (_SEVERITY_ORDER.get(f.severity, 99), f.turn_id)
     )
@@ -338,6 +409,9 @@ def _render_operator_tab() -> None:
     row[3].metric("Draft issues", len(report.suggested_github_issues))
 
     st.info(report.failure_summary)
+
+    _render_operator_metrics(report.operator_metrics, report.metrics)
+    _render_operator_alerts(alerts)
 
     if not findings:
         st.caption(

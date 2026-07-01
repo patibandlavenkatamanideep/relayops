@@ -10,6 +10,14 @@ the customer runtime: no replies, no tools, no policy edits, no broker overrides
 
 from __future__ import annotations
 
+from .alerting import (
+    AlertPacket,
+    AlertReport,
+    AlertThresholds,
+    build_alert_report,
+    evaluate_alerts,
+    report_from_metrics,
+)
 from .metrics import SafetyMetrics, safety_metrics
 from .models import HermesReport, HermesReviewPacket
 from .replay_review import review_replay_result, review_replay_results
@@ -27,4 +35,10 @@ __all__ = [
     "review_replay_results",
     "build_report",
     "report_from_findings",
+    "AlertThresholds",
+    "AlertPacket",
+    "AlertReport",
+    "evaluate_alerts",
+    "report_from_metrics",
+    "build_alert_report",
 ]
