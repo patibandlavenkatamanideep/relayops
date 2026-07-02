@@ -18,6 +18,7 @@ from .alerting import (
     evaluate_alerts,
     report_from_metrics,
 )
+from .approval_review import review_approval_request, review_approval_requests
 from .metrics import SafetyMetrics, safety_metrics
 from .models import HermesReport, HermesReviewPacket
 from .replay_review import review_replay_result, review_replay_results
@@ -33,6 +34,8 @@ __all__ = [
     "review_record",
     "review_replay_result",
     "review_replay_results",
+    "review_approval_request",
+    "review_approval_requests",
     "build_report",
     "report_from_findings",
     "AlertThresholds",
