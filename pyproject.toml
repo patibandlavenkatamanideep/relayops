@@ -23,9 +23,13 @@ dependencies = [
     # `fastapi>=0.110` let environments resolve an old FastAPI against a new
     # Starlette, hitting `Router.__init__() got an unexpected keyword argument
     # 'on_startup'` during API test collection. Pinning both keeps local and CI
-    # on the same working pair.
+    # on the same working pair. Starlette must match the version the full
+    # dependency graph resolves to (mcp / sse-starlette / streamlit pull
+    # starlette 1.3.1); fastapi 0.137.1 accepts starlette>=0.46.0, so 1.3.1 is
+    # in range. Keep this pin equal to constraints/railway.txt or the Railway
+    # build fails with a starlette version conflict.
     "fastapi==0.137.1",
-    "starlette==1.2.1",
+    "starlette==1.3.1",
     "uvicorn>=0.30",
     # Misc
     "pydantic>=2.7",
