@@ -137,6 +137,30 @@ a vertical slice that proves the load-bearing ideas."*
   sensitivity, explicitly not the live broker decision. Hermes may *reference* the
   report's gaps as advisory findings but never imports a file, executes an action,
   or mutates a record — the human/operator stays accountable.
+- **Human approval queue (v2.7)** — a deterministic, local hold for high-risk
+  actions so a sensitive operation is reviewed by a human *before* it executes,
+  without weakening the broker/envelope/tool-server/audit/Hermes control plane. A
+  small policy table (`src/approval/policy.py`) maps a risk level to an approval
+  requirement: `low` (scoped, reversible — device reset, account read) proceeds
+  without approval; `medium` is configurable; `high` (refund/credit, billing
+  adjustment, plan change, outbound sensitive message) and `critical` (account
+  cancellation, contract/account modification, cross-customer or scope-sensitive
+  action) require a human. The `ApprovalQueue` (`src/approval/queue.py`) holds each
+  action as an `ApprovalRequest` and gates execution: `authorize_execution`
+  succeeds only for an approved (single-use) or not-required action; `pending`,
+  `rejected`, and `expired` actions are blocked and audited, so a rejected or
+  expired action can never execute and an approved one executes at most once. Every
+  approve/reject carries a reviewer identity and reason (an anonymous decision is
+  refused), and every transition is recorded as an `ApprovalAuditEvent` on a
+  queue-local trail that never mutates an unrelated audit or action record. The
+  action executor (`src/actions/executor.py`) takes an optional `approval_gate`;
+  when it denies, the tool is not run and the envelope is `REFUSED` with
+  `approval_required`, while omitting it preserves prior behaviour exactly (the
+  public demo path is unchanged). Hermes (`src/hermes/approval_review.py`) surfaces
+  pending/rejected/expired high-risk approvals as read-only advisory findings; it
+  structurally cannot approve, reject, or execute — the human/operator stays
+  accountable. Deterministic and local throughout: no vendor calls, credentials,
+  real PII, or payment/refund execution.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.

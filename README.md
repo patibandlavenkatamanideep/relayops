@@ -581,6 +581,43 @@ python3 -m src.reports.design_partner_report examples/redacted_tickets.csv --jso
 
 Sample data in [examples/](examples/) is **synthetic and redacted** only.
 
+## Human approval queue (v2.7)
+
+v2.7 adds a **human approval queue** for high-risk actions. Sensitive operations
+are *held for a human operator to review before they execute*, so the model still
+proposes, the broker still decides, the action envelope still wraps, and the tool
+server still executes only scoped requests — but for a high-risk action a *person*
+must approve first. It is **deterministic and local**: no vendor calls, no
+credentials, no payment/refund execution, and the public demo's safety posture is
+unchanged.
+
+**Policy** (`src/approval/policy.py`) is a small, readable table over a risk level:
+
+| Risk | Examples | Requires approval? |
+|---|---|---|
+| `low` | device reset, send troubleshooting link, account read | no — scoped and reversible |
+| `medium` | uncategorized actions | configurable (default: no) |
+| `high` | refund / credit, billing adjustment, plan change, outbound sensitive message | **yes** |
+| `critical` | account cancellation, contract/account modification, cross-customer or scope-sensitive action | **yes** |
+
+**Queue** (`src/approval/queue.py`) holds each held action as an `ApprovalRequest`
+and gates execution. `authorize_execution` returns `True` **only** for an approved
+(single-use) or not-required action; a `pending`, `rejected`, or `expired` action
+is blocked and audited. Every approve/reject/expire carries a **reviewer identity
+and reason** (an anonymous decision is rejected), and every transition is recorded
+as an `ApprovalAuditEvent` in a queue-local trail — no unrelated audit or action
+record is mutated.
+
+**Execution boundary** — the action executor (`src/actions/executor.py`) takes an
+optional `approval_gate`; when supplied and it denies, the tool is **not run** and
+the envelope is `REFUSED` with `approval_required`. Omitting it preserves prior
+behaviour exactly, so nothing in the current demo path changes.
+
+**Hermes** (`src/hermes/approval_review.py`) surfaces `pending` / `rejected` /
+`expired` high-risk approvals as read-only advisory findings. It can *see* the
+queue's state; it structurally **cannot** approve, reject, or execute anything —
+the operator remains accountable.
+
 ## Roadmap
 
 | Version | Theme | Status |
@@ -604,6 +641,7 @@ Sample data in [examples/](examples/) is **synthetic and redacted** only.
 | v2.4 | replay verification + audit consistency | shipped |
 | v2.5 | operator metrics dashboard with Hermes alerting | shipped |
 | v2.6 | redacted ticket import + design-partner report | shipped |
+| v2.7 | human approval queue for high-risk actions | shipped |
 
 ## Limitations
 
@@ -629,6 +667,8 @@ src/access/         deterministic access gate
 src/api/            FastAPI service boundary + request-level audit
 src/mcp/            scoped tool bodies
 src/router/         tiered router, policy broker, intent classifiers
+src/actions/        external action envelope + idempotent executor
+src/approval/       human approval queue for high-risk actions (v2.7)
 src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline

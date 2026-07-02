@@ -34,6 +34,10 @@ _REFUSAL_ERRORS = frozenset(
         "broker_denied",
         "invalid_envelope",
         "unknown_tool",
+        # A high-risk action reached the executor without an approved human
+        # decision. This is a permission-style denial (the human gate refused),
+        # not a tool fault, so it maps to REFUSED (see v2.7 approval queue).
+        "approval_required",
     }
 )
 

@@ -51,8 +51,15 @@ def execute_action(
     reversibility: str,
     tool: Callable[[], ToolResult],
     ledger: IdempotencyLedger | None = None,
+    approval_gate: Callable[[], bool] | None = None,
 ) -> tuple[ActionEnvelope, ToolResult]:
-    """Execute ``tool`` inside an envelope, replaying a prior success if any."""
+    """Execute ``tool`` inside an envelope, replaying a prior success if any.
+
+    ``approval_gate`` is the optional v2.7 human-approval check: a callable that
+    returns True only if this action has cleared the approval queue. When it is
+    supplied and denies, the tool is NOT run — the envelope is REFUSED with
+    ``approval_required`` and no side effect occurs. Omitting it keeps the prior
+    behaviour exactly (low-risk scoped actions run as before)."""
     ledger = ledger if ledger is not None else default_ledger
     envelope = ActionEnvelope.opened(
         turn_id=turn_id,
@@ -63,6 +70,11 @@ def execute_action(
         blast_radius=blast_radius,
         reversibility=reversibility,
     )
+
+    if approval_gate is not None and not approval_gate():
+        # High-risk action without human approval: refuse before the side effect.
+        envelope.fail("approval_required")
+        return envelope, ToolResult(ok=False, error="approval_required")
 
     prior = ledger.get(envelope.idempotency_key)
     if prior is not None:
