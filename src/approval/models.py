@@ -111,6 +111,8 @@ class ApprovalRequest:
     risk_level: str
     policy_handle: str
     status: str
+    action_id: str = ""  # links to the action envelope this hold guards, if any
+    requester_id: str = ""  # who/what requested the action (caller / operator / system)
     rationale: str = ""  # why approval was (or was not) required
     created_at: str = field(default_factory=_now)
     expires_at: str = ""  # ISO timestamp; empty means no expiry

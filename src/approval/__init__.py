@@ -32,6 +32,14 @@ from .models import (
     ApprovalRiskLevel,
     ApprovalStatus,
 )
+from .export import (
+    EXEC_ALLOWED,
+    EXEC_BLOCKED,
+    EXEC_CONSUMED,
+    ApprovalAuditExport,
+    ApprovalRecordView,
+    build_approval_export,
+)
 from .policy import (
     HIGH_RISK_ACTIONS,
     LOW_RISK_ACTIONS,
@@ -67,4 +75,11 @@ __all__ = [
     "ApprovalError",
     "default_queue",
     "new_request_id",
+    # export
+    "build_approval_export",
+    "ApprovalAuditExport",
+    "ApprovalRecordView",
+    "EXEC_ALLOWED",
+    "EXEC_BLOCKED",
+    "EXEC_CONSUMED",
 ]

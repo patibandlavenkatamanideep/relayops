@@ -1,0 +1,12 @@
+{
+  "id": "device_status",
+  "title": "Safe device status lookup",
+  "description": "An authenticated customer asks for their device status — a scoped, read-only automation that resolves without a human.",
+  "message": "what is my device status?",
+  "auth_token": "tok_alice",
+  "expect_route": "respond",
+  "expect_approval_required": false,
+  "expect_execution_blocked": false,
+  "expect_replay_status": "pass",
+  "expect_escalated": false
+}

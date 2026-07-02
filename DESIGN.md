@@ -161,6 +161,44 @@ a vertical slice that proves the load-bearing ideas."*
   structurally cannot approve, reject, or execute — the human/operator stays
   accountable. Deterministic and local throughout: no vendor calls, credentials,
   real PII, or payment/refund execution.
+- **Operator approval console & audit export (v2.8)** — makes the v2.7 queue usable
+  from an operator workflow by making high-risk action review visible and
+  exportable, without changing the control plane or the public demo's safety
+  posture. **Export** (`src/approval/export.py`) is a pure read over an
+  `ApprovalQueue`: it groups holds by status (pending/approved/rejected/expired/
+  not-required) and, per record, reports the approval id, linked action id, risk
+  level, status, requester/caller id, customer id, reviewer id + reason (once a
+  human decides), created/updated timestamps, the per-request audit-event history,
+  and whether execution is `allowed`, `blocked` (pending/rejected/expired), or
+  `consumed` (an approved single-use action already run). It renders to a JSON dict
+  and Markdown and computes an *effective* status (a pending hold past its expiry
+  reads as expired) without transitioning a request, recording an event, or
+  executing anything. **Console** (`src/ui/app.py`, Operator Review tab) shows the
+  grouped holds with risk level and per-record audit trail, JSON/Markdown export
+  buttons, and optional approve/reject controls that require an operator identity
+  and reason (anonymous/unexplained decisions are refused); approving only makes an
+  action *eligible* to run once — the console never auto-executes and has no
+  vendor/payment path, and demo records are labelled synthetic. Hermes references
+  the same pending/rejected/expired holds as read-only advisory findings; it cannot
+  approve, reject, execute, or mutate any approval record.
+- **End-to-end scenario runner (v2.9)** — the layer that makes the whole project
+  demoable as one flow. `src/scenarios` runs a single synthetic, redacted ticket
+  through the entire control plane and records a deterministic, per-stage lifecycle:
+  ingest → auth/scope → broker decision → action envelope → tool boundary → approval
+  requirement → audit record → replay verification → operator metrics → Hermes
+  review/alerting → approval/audit export → final report. It *composes the real
+  modules* (pipeline, audit ledger, replay verifier, operator metrics, Hermes,
+  approval queue/export) rather than re-implementing them, so the runner is
+  evidence that the layers actually interlock — not a mock. Five samples each prove
+  one property: `device_status` (safe scoped automation), `high_risk_refund`
+  (approval required before execution), `cross_customer_block` (scope violation
+  refused at the tool boundary), `missing_evidence_faq` (fail-closed handoff when
+  grounding is missing), and `replay_mismatch` (the verifier catching an injected
+  inconsistency). Output renders to a JSON dict or Markdown. It is deterministic and
+  local — no vendor calls, no credentials, no real customer data, no real external
+  execution; the only synthetic touch is the replay-drift injection, which mutates a
+  *copy* of the replayed audit record so the live turn is unaffected. A
+  human/operator remains accountable for every escalated or held case.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
