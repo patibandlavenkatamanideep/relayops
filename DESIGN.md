@@ -199,9 +199,62 @@ a vertical slice that proves the load-bearing ideas."*
   execution; the only synthetic touch is the replay-drift injection, which mutates a
   *copy* of the replayed audit record so the live turn is unaffected. A
   human/operator remains accountable for every escalated or held case.
+- **Production pilot readiness pack (v3.0)** — packaging, not new runtime surface.
+  v3.0 makes the whole control plane easy to *evaluate* — by a founder, hiring
+  manager, AI team, or design partner — without adding real credentials, vendor
+  calls, customer data, or execution. It adds a documentation pack under `docs/`
+  ([PILOT_READINESS](../docs/PILOT_READINESS.md), [SECURITY_MODEL](../docs/SECURITY_MODEL.md),
+  [DEPLOYMENT_ARCHITECTURE](../docs/DEPLOYMENT_ARCHITECTURE.md),
+  [DATA_RETENTION](../docs/DATA_RETENTION.md), [DESIGN_PARTNER_GUIDE](../docs/DESIGN_PARTNER_GUIDE.md),
+  [OPERATOR_REVIEW_GUIDE](../docs/OPERATOR_REVIEW_GUIDE.md),
+  [SCENARIO_RUNNER_GUIDE](../docs/SCENARIO_RUNNER_GUIDE.md)) that states the control-plane
+  overview, the safe-demo checklist, the security model, the demo-vs-production
+  boundary, the data policy, and how design partners and operators use the system.
+  No runtime behavior, UI, or safety posture changes in v3.0; Hermes stays
+  read-only/advisory and no real external execution is added.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
+
+### The v3.0 control plane, end to end (how the v2.x layers fit)
+
+By v3.0 the layers compose into one plane, each stage a checkable boundary. A single
+turn (and the [scenario runner](../docs/SCENARIO_RUNNER_GUIDE.md) walks exactly this):
+
+```
+API boundary (auth + rate limit)
+  → deterministic access gate (scope, non-LLM)
+  → router / classifier (tiered)
+  → RAG/FAQ evidence (grounded only; else escalate)
+  → pre-action intent packet          [the model PROPOSES]
+  → policy broker                     [the broker DECIDES]
+  → action envelope (idempotent)      [the envelope WRAPS]
+  → MCP-style scoped tool server      [executes only ALLOWED scoped requests]
+  → human approval queue              [high-risk HELD for a human]
+  → guardrail (independent)           [vets the candidate reply]
+  → respond OR hand off               [reply built from the broker decision]
+  → audit ledger                      [records every state]
+     ↑ operator side (read-only): replay verification · operator metrics ·
+       Hermes review/alerting · redacted ticket import/report · approval
+       console/audit export · scenario runner
+```
+
+**The core invariant, stated once:** The model proposes. The broker decides. The
+action envelope wraps. The tool server executes only allowed scoped requests.
+High-risk actions require human approval before execution. The audit ledger records
+every state. Replay verification checks consistency. Operator metrics summarize
+safety/usefulness. Hermes reviews traces and alerts. The scenario runner demonstrates
+the lifecycle. **The human/operator remains accountable.**
+
+**Prototype vs. production boundary.** The load-bearing *control logic* is built and
+tested: gate, broker, envelope, scoped tool boundary, approval queue, audit/replay,
+Hermes (advisory), and the scenario runner. What is deliberately deferred is
+*integration*, not the control plane: real IdP/OAuth auth, a managed and
+tamper-evident datastore, real vendor tools (behind the same scope + approval gates),
+real execution, a shared rate limiter, and a shadow→canary→full rollout. The
+prototype uses synthetic data, offline template composition, and no real execution —
+so it is safe to run in public while still demonstrating the production-shaped
+architecture.
 
 ## 3. The v1.8.1 system, drawn once (synchronous, chat-only)
 ```
