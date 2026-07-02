@@ -8,18 +8,30 @@
 **Production-shaped AI support agent for telecom / subscription billing.**<br>
 Scoped permissions · route safety · decision traces · audit export · human handoff.
 
-Status: **v2.6 working prototype** — FastAPI service layer with signed bearer-token
-auth and per-caller rate limiting, request-level audit, Pre-Action Intent Packets,
-Broker Decision Packets, an enforced policy-handle registry, an MCP-style
-tool-server boundary, external action envelopes with idempotent replay, replay
-verification over audit traces, a SQLite customer/auth datastore, a read-only
-Hermes operator review, an operator metrics dashboard (resolution / handoff /
-safety / replay / efficiency) with thresholded Hermes breach alerting, a redacted
-ticket import + design-partner report workflow, live
-Streamlit demo, Decision Console, Handoff Queue,
-support-ticket batch runner, public-dataset importers, Qwen LoRA evals, optional
-local LLM composer, and pinned Railway deployment.
+Status: **v3.0 — production pilot readiness** — a production-shaped pilot of the
+full control plane: FastAPI service layer with signed bearer-token auth and
+per-caller rate limiting, request-level audit, Pre-Action Intent Packets, Broker
+Decision Packets, an enforced policy-handle registry, an MCP-style tool-server
+boundary, external action envelopes with idempotent replay, replay verification
+over audit traces, a SQLite customer/auth datastore, a read-only Hermes operator
+review, an operator metrics dashboard (resolution / handoff / safety / replay /
+efficiency) with thresholded Hermes breach alerting, a redacted ticket import +
+design-partner report workflow, a **human approval queue** for high-risk actions
+with an **operator approval console + audit export**, an **end-to-end scenario
+runner** that walks one ticket through the whole lifecycle, and a **pilot-readiness
+documentation pack** ([docs/PILOT_READINESS.md](docs/PILOT_READINESS.md)) — plus the
+live Streamlit demo, Decision Console, Handoff Queue, support-ticket batch runner,
+public-dataset importers, Qwen LoRA evals, optional local LLM composer, and pinned
+Railway deployment.
 Qwen LoRA adapter [published to Hugging Face](https://huggingface.co/venkatamanideep/relayops-intent-qwen).
+
+**Pilot-readiness docs:** [Pilot Readiness](docs/PILOT_READINESS.md) ·
+[Security Model](docs/SECURITY_MODEL.md) ·
+[Deployment Architecture](docs/DEPLOYMENT_ARCHITECTURE.md) ·
+[Data Retention](docs/DATA_RETENTION.md) ·
+[Design-Partner Guide](docs/DESIGN_PARTNER_GUIDE.md) ·
+[Operator Review Guide](docs/OPERATOR_REVIEW_GUIDE.md) ·
+[Scenario Runner Guide](docs/SCENARIO_RUNNER_GUIDE.md)
 
 > **Core thesis:** RelayOps treats AI support as a control system: scoped
 > permissions, route safety, decision traces, audit export, and human handoff.
@@ -48,6 +60,58 @@ auditable, and handoff-ready** outcomes in regulated domains.
 > users** and no real-traffic numbers. "Production-shaped" means the architecture
 > mirrors production controls: access gate, scoped tools, guardrails, audit trail,
 > and handoff.
+
+## What RelayOps is / is not
+
+**What RelayOps is**
+
+- A **control plane** for AI customer-support agents: the deterministic safety layer
+  that decides what an agent may do, executes only scoped actions, holds high-risk
+  actions for a human, and records auditable evidence of every decision.
+- A **working prototype that runs end to end locally** with production-shaped
+  controls (access gate, broker, action envelope, scoped tool boundary, approval
+  queue, audit + replay, Hermes review).
+- **Deterministic and safe by default** — offline template replies, synthetic data,
+  no keys required.
+- **Evaluatable in one command** via the [scenario runner](docs/SCENARIO_RUNNER_GUIDE.md)
+  and with your own **redacted** tickets via the [design-partner workflow](docs/DESIGN_PARTNER_GUIDE.md).
+
+**What RelayOps is not**
+
+- **Not** a production deployment — **no real customers, no real production traffic.**
+- **Not** connected to any real vendor / CRM / billing / telecom system — **no real
+  vendor execution.**
+- **Not** performing any **real payment, refund, cancellation, or external action.**
+- **Not** a store of real customer PII — data is synthetic or redacted only.
+- **Not** an autonomous decision-maker for high-risk actions — those require a named
+  human; Hermes is read-only/advisory and never approves, rejects, or executes.
+
+## Run locally
+
+No keys needed; the default posture is offline and deterministic.
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e .
+
+# 1) end-to-end lifecycle demo over synthetic tickets
+python -m src.scenarios.runner
+python -m src.scenarios.runner examples/scenarios/high_risk_refund.json
+
+# 2) the Streamlit demo (Chat, Batch, Decision Console, Handoff Queue, Operator Review)
+streamlit run src/ui/app.py
+
+# 3) the HTTP service (GET /healthz, POST /v1/turn, ...)
+uvicorn src.api.main:app --reload
+
+# 4) release verification — all three must pass
+.venv/bin/python -m unittest
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+```
+
+See [docs/PILOT_READINESS.md](docs/PILOT_READINESS.md) for environment variables,
+the safe-demo checklist, and the prototype-vs-production boundary.
 
 ## Guardrail Hero Demo
 
@@ -712,6 +776,7 @@ catch; the live turn is unaffected.
 | v2.7 | human approval queue for high-risk actions | shipped |
 | v2.8 | operator approval console + audit export | shipped |
 | v2.9 | end-to-end pilot demo & scenario runner | shipped |
+| v3.0 | production pilot readiness pack (docs + packaging) | shipped |
 
 ## Limitations
 
@@ -754,6 +819,14 @@ More detail:
 
 - [DESIGN.md](DESIGN.md) — full production design and deferred scope.
 - [MODEL_CARD.md](MODEL_CARD.md) — Qwen LoRA adapter card.
+- **Pilot-readiness pack (v3.0):**
+  - [docs/PILOT_READINESS.md](docs/PILOT_READINESS.md) — control-plane overview + safe-demo checklist.
+  - [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md) — threat model and safety guarantees.
+  - [docs/DEPLOYMENT_ARCHITECTURE.md](docs/DEPLOYMENT_ARCHITECTURE.md) — demo vs. production shape.
+  - [docs/DATA_RETENTION.md](docs/DATA_RETENTION.md) — data handling, allowed vs. forbidden.
+  - [docs/DESIGN_PARTNER_GUIDE.md](docs/DESIGN_PARTNER_GUIDE.md) — evaluate with 20–100 redacted tickets.
+  - [docs/OPERATOR_REVIEW_GUIDE.md](docs/OPERATOR_REVIEW_GUIDE.md) — inspect findings, metrics, approvals.
+  - [docs/SCENARIO_RUNNER_GUIDE.md](docs/SCENARIO_RUNNER_GUIDE.md) — the one-command end-to-end demo.
 - [docs/tradeoff-defense.md](docs/tradeoff-defense.md) — design tradeoffs and critique prep.
 - [docs/ai-pr-review-policy.md](docs/ai-pr-review-policy.md) — CI-only PR safety reviewer policy.
 - [docs/design-partner-notes.md](docs/design-partner-notes.md) — validation template for redacted ticket samples.
