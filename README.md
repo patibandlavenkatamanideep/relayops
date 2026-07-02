@@ -650,6 +650,42 @@ no vendor/payment path. Console records in the public demo are clearly labelled
 findings in the console; it cannot approve, reject, execute, or mutate any approval
 record.
 
+## End-to-end scenario runner (v2.9)
+
+v2.9 connects every layer into **one readable demo**. Instead of explaining each
+module separately, run a single synthetic, redacted ticket and watch it traverse
+the whole control plane:
+
+```
+ingest → auth/scope → broker decision → action envelope → tool boundary →
+approval requirement → audit record → replay verification → operator metrics →
+Hermes review/alerting → approval/audit export → final report
+```
+
+The runner (`src/scenarios/`) composes the **real** modules (pipeline, audit
+ledger, replay, operator metrics, Hermes, approval queue/export) — it re-implements
+nothing — and emits a deterministic per-stage lifecycle as a JSON dict or Markdown.
+It is local and read-only: no vendor calls, no credentials, no real customer data,
+no real external execution. Five synthetic scenarios each prove one property:
+
+| Scenario | Proves |
+|---|---|
+| `device_status` | normal safe automation path (scoped read) |
+| `high_risk_refund` | approval required before execution |
+| `cross_customer_block` | scope violation blocked at the tool boundary |
+| `missing_evidence_faq` | fail-closed handoff when grounding is missing |
+| `replay_mismatch` | replay verification catches an injected inconsistency |
+
+```bash
+# run one scenario file, or omit the path to run all five samples
+python3 -m src.scenarios.runner examples/scenarios/high_risk_refund.json
+python3 -m src.scenarios.runner --json
+```
+
+The one deliberately synthetic touch is the `replay_mismatch` drift, which mutates
+a *copy* of the replayed audit record so the verifier has an inconsistency to
+catch; the live turn is unaffected.
+
 ## Roadmap
 
 | Version | Theme | Status |
@@ -675,6 +711,7 @@ record.
 | v2.6 | redacted ticket import + design-partner report | shipped |
 | v2.7 | human approval queue for high-risk actions | shipped |
 | v2.8 | operator approval console + audit export | shipped |
+| v2.9 | end-to-end pilot demo & scenario runner | shipped |
 
 ## Limitations
 
@@ -702,6 +739,7 @@ src/mcp/            scoped tool bodies
 src/router/         tiered router, policy broker, intent classifiers
 src/actions/        external action envelope + idempotent executor
 src/approval/       human approval queue + operator audit export (v2.7–v2.8)
+src/scenarios/      end-to-end scenario runner (v2.9)
 src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline

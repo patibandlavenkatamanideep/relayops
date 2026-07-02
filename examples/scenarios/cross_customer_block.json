@@ -1,0 +1,13 @@
+{
+  "id": "cross_customer_block",
+  "title": "Cross-customer access attempt",
+  "description": "An authenticated customer tries to reset a device owned by a different customer. The scoped tool refuses on a scope violation.",
+  "message": "reset my router please",
+  "auth_token": "tok_bob",
+  "device_id": "dev_a1",
+  "expect_route": "human_escalation",
+  "expect_approval_required": true,
+  "expect_execution_blocked": true,
+  "expect_replay_status": "pass",
+  "expect_escalated": true
+}

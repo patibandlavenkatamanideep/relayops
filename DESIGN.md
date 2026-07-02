@@ -181,6 +181,24 @@ a vertical slice that proves the load-bearing ideas."*
   vendor/payment path, and demo records are labelled synthetic. Hermes references
   the same pending/rejected/expired holds as read-only advisory findings; it cannot
   approve, reject, execute, or mutate any approval record.
+- **End-to-end scenario runner (v2.9)** — the layer that makes the whole project
+  demoable as one flow. `src/scenarios` runs a single synthetic, redacted ticket
+  through the entire control plane and records a deterministic, per-stage lifecycle:
+  ingest → auth/scope → broker decision → action envelope → tool boundary → approval
+  requirement → audit record → replay verification → operator metrics → Hermes
+  review/alerting → approval/audit export → final report. It *composes the real
+  modules* (pipeline, audit ledger, replay verifier, operator metrics, Hermes,
+  approval queue/export) rather than re-implementing them, so the runner is
+  evidence that the layers actually interlock — not a mock. Five samples each prove
+  one property: `device_status` (safe scoped automation), `high_risk_refund`
+  (approval required before execution), `cross_customer_block` (scope violation
+  refused at the tool boundary), `missing_evidence_faq` (fail-closed handoff when
+  grounding is missing), and `replay_mismatch` (the verifier catching an injected
+  inconsistency). Output renders to a JSON dict or Markdown. It is deterministic and
+  local — no vendor calls, no credentials, no real customer data, no real external
+  execution; the only synthetic touch is the replay-drift injection, which mutates a
+  *copy* of the replayed audit record so the live turn is unaffected. A
+  human/operator remains accountable for every escalated or held case.
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
