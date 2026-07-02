@@ -1,0 +1,12 @@
+{
+  "id": "high_risk_refund",
+  "title": "High-risk refund request",
+  "description": "A money-touching refund request. The broker escalates it and the approval queue holds it — a high-risk action cannot execute without a human.",
+  "message": "I want a refund on my last bill",
+  "auth_token": "tok_alice",
+  "expect_route": "human_escalation",
+  "expect_approval_required": true,
+  "expect_execution_blocked": true,
+  "expect_replay_status": "pass",
+  "expect_escalated": true
+}
