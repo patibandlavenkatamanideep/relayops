@@ -5,7 +5,8 @@ Tabs:
   * Batch Run        — process a sample support queue.
   * Decision Console — live audit ledger, route mix, safety counters, exports.
   * Handoff Queue    — escalations rendered as actionable, owner-routed tickets.
-  * Operator Review  — read-only Hermes review of the audit trail (advisory).
+  * Operator Review  — read-only Hermes review of the audit trail (advisory),
+                       plus the Approval Console for high-risk action review/export.
 
 Run:
     streamlit run src/ui/app.py
@@ -25,9 +26,14 @@ if str(_ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
+from src.approval import ApprovalError, ApprovalQueue, build_approval_export  # noqa: E402
 from src.graph.pipeline import handle_turn  # noqa: E402
 from src.guardrails import guardrail  # noqa: E402
-from src.hermes import build_alert_report, build_report  # noqa: E402
+from src.hermes import (  # noqa: E402
+    build_alert_report,
+    build_report,
+    review_approval_requests,
+)
 from src.policy import registry as policy_registry  # noqa: E402
 from src.observability.audit_ledger import AuditLedger  # noqa: E402
 from src.observability.audit_store import AuditStore  # noqa: E402
@@ -299,6 +305,159 @@ def _render_queue_tab() -> None:
                     st.rerun()
 
 
+# --- approval console (v2.8) ---------------------------------------------------
+
+
+def _approval_queue() -> ApprovalQueue:
+    """One in-session approval queue for the operator console.
+
+    Seeded with a small **synthetic** set of high-risk holds so the console is
+    demonstrable in the public demo — the live demo pipeline only performs
+    low-risk device actions, which never require approval. Nothing here executes:
+    approve/reject only transition the local queue's review state.
+    """
+    if "approval_queue" not in st.session_state:
+        q = ApprovalQueue()
+        q.request_approval(
+            action="refund",
+            target_resource="inv_1042",
+            customer_id="cust_alice",
+            requester_id="agent_assist",
+            policy_handle="billing.refund.requires_human",
+        )
+        q.request_approval(
+            action="account_cancellation",
+            target_resource="acct_2201",
+            customer_id="cust_bob",
+            requester_id="agent_assist",
+            policy_handle="account.change.requires_human",
+        )
+        approved = q.request_approval(
+            action="billing_adjustment",
+            target_resource="inv_3310",
+            customer_id="cust_carol",
+            requester_id="agent_assist",
+            policy_handle="billing.adjustment.requires_human",
+        )
+        q.approve(
+            approved.request_id,
+            reviewer="ops_demo",
+            reason="verified charge history (synthetic demo record)",
+        )
+        st.session_state["approval_queue"] = q
+    return st.session_state["approval_queue"]
+
+
+def _render_approval_decision_controls(queue: ApprovalQueue, pending_ids: list[str]) -> None:
+    """Approve/reject controls. Both paths REQUIRE an operator identity and a
+    reason — an anonymous or unexplained decision is refused — and neither
+    executes anything (an approved action still only becomes *eligible* to run)."""
+    if not pending_ids:
+        return
+    with st.form("approval_decision_form", clear_on_submit=True):
+        st.markdown("**Record a decision** (operator identity and reason required)")
+        request_id = st.selectbox("Pending approval", pending_ids)
+        reviewer = st.text_input("Reviewer identity", placeholder="e.g. ops_jordan")
+        reason = st.text_area("Reason", placeholder="Why approve or reject this action?")
+        cols = st.columns(2)
+        approve_clicked = cols[0].form_submit_button("Approve", use_container_width=True)
+        reject_clicked = cols[1].form_submit_button("Reject", use_container_width=True)
+
+    if not (approve_clicked or reject_clicked):
+        return
+    if not reviewer.strip() or not reason.strip():
+        st.warning("Both a reviewer identity and a reason are required to record a decision.")
+        return
+    try:
+        if approve_clicked:
+            queue.approve(request_id, reviewer=reviewer.strip(), reason=reason.strip())
+            st.success(f"Approved {request_id}. It is now eligible to execute once (not auto-run).")
+        else:
+            queue.reject(request_id, reviewer=reviewer.strip(), reason=reason.strip())
+            st.success(f"Rejected {request_id}. It can never execute.")
+    except (ApprovalError, ValueError) as exc:
+        st.warning(str(exc))
+
+
+def _render_approval_console() -> None:
+    st.markdown("### Approval Console")
+    st.caption(
+        "Operator view of the human approval queue: high-risk actions held for "
+        "review before execution. Records shown are **synthetic demo holds** — the "
+        "live demo performs only low-risk actions. Approve/reject requires an "
+        "operator identity and reason and executes nothing."
+    )
+    queue = _approval_queue()
+    export = build_approval_export(queue)
+
+    row = st.columns(4)
+    row[0].metric("Pending", len(export.pending))
+    row[1].metric("Approved", len(export.approved))
+    row[2].metric("Rejected", len(export.rejected))
+    row[3].metric("Blocked from executing", export.blocked_count)
+
+    section_map = {
+        "Pending Approvals": export.pending,
+        "Approved Actions": export.approved,
+        "Rejected Actions": export.rejected,
+        "Expired Actions": export.expired,
+    }
+    for title, views in section_map.items():
+        if not views:
+            continue
+        st.markdown(f"**{title}**")
+        for v in views:
+            label = f"{v.risk_level.upper()} · {v.action} · {v.execution} · {v.approval_id}"
+            with st.expander(label, expanded=False):
+                st.write(
+                    {
+                        "approval_id": v.approval_id,
+                        "action_id": v.action_id or "—",
+                        "action": v.action,
+                        "risk_level": v.risk_level,
+                        "status": v.status,
+                        "requester_id": v.requester_id or "—",
+                        "customer_id": v.customer_id or "—",
+                        "reviewer_id": v.reviewer_id or "—",
+                        "reason": v.reason or "—",
+                        "execution": v.execution,
+                        "blocked": v.blocked,
+                    }
+                )
+                st.caption("Audit trail")
+                st.write([f"{e['event']} @ {e['timestamp']}" for e in v.audit_events])
+
+    _render_approval_decision_controls(queue, [v.approval_id for v in export.pending])
+
+    # Hermes surfaces the same holds as read-only advisory findings.
+    findings = review_approval_requests(list(queue.requests.values()))
+    if findings:
+        st.markdown("**Hermes advisory findings (read-only)**")
+        for f in findings:
+            st.markdown(f"- {_SEVERITY_BADGE.get(f.severity, f.severity)} · {f.summary}")
+
+    cols = st.columns(2)
+    cols[0].download_button(
+        "Export approvals JSON",
+        data=json.dumps(export.to_dict(), indent=2),
+        file_name="relayops_approval_audit.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    cols[1].download_button(
+        "Export approvals Markdown",
+        data=export.to_markdown(),
+        file_name="relayops_approval_audit.md",
+        mime="text/markdown",
+        use_container_width=True,
+    )
+    st.caption(
+        "Read-only export. Hermes may reference these holds; it cannot approve, "
+        "reject, execute, or mutate any approval record — a human stays accountable."
+    )
+    st.divider()
+
+
 # --- operator review (Hermes) --------------------------------------------------
 
 
@@ -412,6 +571,7 @@ def _render_operator_tab() -> None:
 
     _render_operator_metrics(report.operator_metrics, report.metrics)
     _render_operator_alerts(alerts)
+    _render_approval_console()
 
     if not findings:
         st.caption(
