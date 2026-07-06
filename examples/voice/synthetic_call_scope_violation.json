@@ -1,0 +1,13 @@
+{
+  "channel": "voice",
+  "call_id": "synthetic_call_003",
+  "caller_id": "caller_bob",
+  "customer_id": "cust_bob",
+  "transcript": "Reset my router please.",
+  "language": "en-US",
+  "started_at": "2026-07-06T14:11:10Z",
+  "confidence": 0.89,
+  "redaction_notes": "synthetic transcript — caller Bob targets Alice's device (dev_a1); scope must be refused",
+  "auth_token": "tok_bob",
+  "device_id": "dev_a1"
+}

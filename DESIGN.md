@@ -212,6 +212,21 @@ a vertical slice that proves the load-bearing ideas."*
   boundary, the data policy, and how design partners and operators use the system.
   No runtime behavior, UI, or safety posture changes in v3.0; Hermes stays
   read-only/advisory and no real external execution is added.
+- **Voice channel adapter (v3.2)** — voice as an input/output *channel*, not a new
+  autonomous phone agent. `src/channels/voice` normalizes a **synthetic** call
+  transcript into the exact request shape the pipeline already consumes (text +
+  optional passthrough token/device) and carries `VoiceChannelMetadata` (channel,
+  call_id, caller_id, customer_id, language, confidence, redaction notes) plus a
+  `voice_<call_id>` turn id so the audit record ties back to the call. The adapter
+  is a pure normalizer: it validates required fields, rejects an empty transcript,
+  reads only known fields (a stray audio URL/secret is dropped), mints no
+  authority (`customer_id`/`caller_id` are advisory; only a passed-through demo
+  token authenticates, via the unchanged access gate), and — critically —
+  *executes nothing, decides no risk, and connects to no voice provider* (no
+  Twilio, phone number, audio, STT/TTS, or outbound call). Downstream is unchanged:
+  a refund voice call still escalates, a cross-customer voice call is still refused
+  at the scoped tool boundary, and the broker/envelope/approval/audit/replay/Hermes
+  all behave exactly as for typed chat. See [VOICE_CHANNEL](../docs/VOICE_CHANNEL.md).
 - **MCP (Model Context Protocol)** — the standard client/server boundary for agent
   tool access. Relay's tools (account lookup, device reset, send-link) live behind an
   MCP server that enforces per-customer scoping; the agent is an MCP client.
