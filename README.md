@@ -412,25 +412,38 @@ slice can't action), and the **top failure categories**.
 
 ## Built Vs Deferred
 
-| Built | Deferred / designed |
-|---|---|
-| Deterministic access gate | Real MCP transport boundary |
-| Server-side scoped tool bodies | Token/cost dashboards |
-| Keyword, NB, calibrated NB, Qwen LoRA classifiers | Voice |
-| 100-case Qwen adversarial rerun | Event bus |
-| FastAPI service boundary + request-level audit | Shadow/canary rollout |
-| `/v1/turn` packet/audit response contract | Hermes-style operator agent |
-| Pre-Action Intent Packet | Production traffic validation |
-| Policy Broker + Broker Decision Packet | Production traffic validation |
-| Final Reply Packet generated from broker decision | Cost per resolved ticket |
-| Hybrid RAG with citations | Design-partner redacted-queue run |
-| Offer/PII/tone guardrail | DataStore + real auth store |
-| Optional local LLM composer, triple-gated and disabled in public deploy | JWT auth + rate limiting |
-| Durable audit store + Decision Console | External action envelope |
-| Human Handoff Queue |  |
-| Support-ticket batch runner |  |
-| Public-dataset importers (Kaggle/HF/Twitter) |  |
-| CI-only PR Safety Evidence Gate |  |
+**Built** (shipped through v1.0–v3.0, covered by the test suite):
+
+- Deterministic access gate + server-side scoped, MCP-style tool boundary
+- Customer/auth datastore (SQLite) — *replaces the old "DataStore + real auth store" item*
+- Bearer-token (HS256) auth + per-caller rate limiting
+- Keyword, NB, calibrated NB, and Qwen LoRA classifiers (100-case adversarial rerun)
+- Hybrid RAG with citations · offer/PII/tone guardrail
+- Pre-Action Intent Packet · Policy Broker + Broker Decision Packet · Final Reply Packet from the broker decision
+- External action envelope + idempotent replay
+- Replay verification over audit traces
+- Operator metrics dashboard + **Hermes** read-only operator agent with threshold alerting
+- Redacted ticket import + design-partner report
+- Human approval queue for high-risk actions
+- Approval console + audit export (JSON / Markdown)
+- End-to-end scenario runner (one ticket through the whole lifecycle)
+- FastAPI service boundary + request-level audit (`/v1/turn` packet/audit contract)
+- Durable audit store + Decision Console · Human Handoff Queue · support-ticket batch runner
+- Public-dataset importers (Kaggle / HF / Twitter)
+- Optional local LLM composer — triple-gated, disabled in the public deploy
+- CI-only PR Safety Evidence Gate
+- Pilot-readiness documentation pack ([docs/PILOT_READINESS.md](docs/PILOT_READINESS.md))
+
+**Deferred** (designed, intentionally not built — no real customers or execution):
+
+- Real vendor / CRM / billing / telecom integrations
+- Production customer traffic and validation
+- Real payment / refund / cancellation execution
+- External auth provider (OAuth / OIDC) + secret manager
+- Event-driven production infra (bus, async workers)
+- Real design-partner validation on live redacted queues
+- Managed, tamper-evident (append-only / hash-chained) datastore
+- Shadow / canary rollout · token/cost dashboards · voice
 
 The PR Safety Evidence Gate is advisory and CI-only. It checks risky changes to
 access control, scoped tools, routing, guardrails, evals, metrics, and README
