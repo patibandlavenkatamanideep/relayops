@@ -1,0 +1,12 @@
+{
+  "channel": "voice",
+  "call_id": "synthetic_call_001",
+  "caller_id": "caller_alice",
+  "customer_id": "cust_alice",
+  "transcript": "My router is not working. Can you reset it?",
+  "language": "en-US",
+  "started_at": "2026-07-06T14:03:00Z",
+  "confidence": 0.94,
+  "redaction_notes": "synthetic transcript — no real caller, audio, or PII",
+  "auth_token": "tok_alice"
+}

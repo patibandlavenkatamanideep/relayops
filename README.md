@@ -790,6 +790,8 @@ catch; the live turn is unaffected.
 | v2.8 | operator approval console + audit export | shipped |
 | v2.9 | end-to-end pilot demo & scenario runner | shipped |
 | v3.0 | production pilot readiness pack (docs + packaging) | shipped |
+| v3.1 | README/readiness polish | shipped |
+| v3.2 | voice channel adapter (synthetic transcripts) | shipped |
 
 ## Limitations
 
@@ -818,6 +820,7 @@ src/router/         tiered router, policy broker, intent classifiers
 src/actions/        external action envelope + idempotent executor
 src/approval/       human approval queue + operator audit export (v2.7–v2.8)
 src/scenarios/      end-to-end scenario runner (v2.9)
+src/channels/       input/output channels — synthetic voice adapter (v3.2)
 src/rag/            hybrid retrieval + citations
 src/guardrails/     independent guardrail layer
 src/graph/          synchronous graph-shaped pipeline
@@ -840,6 +843,7 @@ More detail:
   - [docs/DESIGN_PARTNER_GUIDE.md](docs/DESIGN_PARTNER_GUIDE.md) — evaluate with 20–100 redacted tickets.
   - [docs/OPERATOR_REVIEW_GUIDE.md](docs/OPERATOR_REVIEW_GUIDE.md) — inspect findings, metrics, approvals.
   - [docs/SCENARIO_RUNNER_GUIDE.md](docs/SCENARIO_RUNNER_GUIDE.md) — the one-command end-to-end demo.
+  - [docs/VOICE_CHANNEL.md](docs/VOICE_CHANNEL.md) — synthetic voice-transcript channel adapter (v3.2).
 - [docs/tradeoff-defense.md](docs/tradeoff-defense.md) — design tradeoffs and critique prep.
 - [docs/ai-pr-review-policy.md](docs/ai-pr-review-policy.md) — CI-only PR safety reviewer policy.
 - [docs/design-partner-notes.md](docs/design-partner-notes.md) — validation template for redacted ticket samples.

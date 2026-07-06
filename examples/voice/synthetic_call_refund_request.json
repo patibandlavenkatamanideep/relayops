@@ -1,0 +1,12 @@
+{
+  "channel": "voice",
+  "call_id": "synthetic_call_002",
+  "caller_id": "caller_alice",
+  "customer_id": "cust_alice",
+  "transcript": "I want a refund on my last bill.",
+  "language": "en-US",
+  "started_at": "2026-07-06T14:07:30Z",
+  "confidence": 0.91,
+  "redaction_notes": "synthetic transcript — no real caller, audio, or PII",
+  "auth_token": "tok_alice"
+}
